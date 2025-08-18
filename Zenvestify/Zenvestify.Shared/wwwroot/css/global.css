@@ -1,0 +1,30 @@
+:root {
+	--brand: #6a8dff;
+	--bg: #0f1020;
+	--card: #151a2b;
+	--text: #e8eaf1;
+}
+
+html, body {
+	height: 100%
+}
+
+body {
+	background: var(--bg);
+	color: var(--text);
+}
+
+.card {
+	background: var(--card);
+	border-radius: 12px
+}
+
+.btn-brand {
+	background: var(--brand);
+	color: #fff;
+	border: none
+}
+
+a.active {
+	color: var(--brand) !important
+}
