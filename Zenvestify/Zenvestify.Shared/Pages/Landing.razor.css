@@ -1,0 +1,29 @@
+.landing-hero {
+	background: radial-gradient(1200px 600px at 50% -20%, rgba(106,141,255,.35), transparent), linear-gradient(135deg, #0f1020 0%, #151a2b 60%, #0f1020 100%);
+	color: #e8eaf1;
+}
+
+.bg-gradient-primary {
+	background: linear-gradient(90deg,#6a8dff 0%, #9b6aff 100%) !important;
+}
+
+.btn-brand {
+	background: #6a8dff;
+	border: none;
+	color: #fff;
+	box-shadow: 0 10px 24px rgba(106,141,255,.35);
+}
+
+.btn-brand:hover {
+	filter: brightness(1.05);
+}
+
+.card {
+	background: #151a2b;
+	color: #e8eaf1;
+	border: 1px solid rgba(255,255,255,.06);
+}
+
+.text-light-emphasis {
+	color: rgba(232,234,241,.8) !important;
+}

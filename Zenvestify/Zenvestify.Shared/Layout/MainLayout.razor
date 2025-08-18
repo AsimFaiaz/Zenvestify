@@ -1,23 +1,27 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<div class="app-shell">
+    <aside class="app-sidebar">
+        <div class="brand">Zenvestify</div>
+        <nav class="nav flex-column">
+            <a class="nav-link" href="/dashboard">Dashboard</a>
+            <a class="nav-link" href="/expenses">Expenses</a>
+            <a class="nav-link" href="/bills">Bills</a>
+            <a class="nav-link" href="/savings">Savings</a>
+            <a class="nav-link" href="/loans">Loans</a>
+            <a class="nav-link" href="/tax">Tax Centre</a>
+            <a class="nav-link" href="/reports">Reports</a>
+            <a class="nav-link" href="/settings">Settings</a>
+        </nav>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+    <main class="app-main">
+        <header class="app-topbar">
+            <h5 class="m-0">Welcome</h5>
+        </header>
 
-        <article class="content px-4">
+        <div class="container-fluid py-4">
             @Body
-        </article>
+        </div>
     </main>
-</div>
-
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
 </div>
