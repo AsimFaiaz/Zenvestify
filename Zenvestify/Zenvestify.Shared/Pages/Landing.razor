@@ -3,16 +3,23 @@
 @layout NotLoggedInLayout
 @inject NavigationManager Nav
 
-<section class="landing-hero text-center py-5">
+<section class="landing-hero bg-grid text-center py-5">
     <div class="container">
-        <span class="badge rounded-pill bg-gradient-primary px-3 py-2 mb-3">New • Zenvestify</span>
-        <h1 id="greet" class="display-4 fw-bold mb-2">Welcome 👋</h1>
+        <div class="container-sm">
+            <h1 class="display-3 fw-bold hero-heading mb-0 topLevel">Simplify money</h1>
+            <h1 class="display-3 fw-bold hero-heading mt-1 bottomLevel">Maximize savings</h1>
+        </div>
+       
         <p class="lead text-light-emphasis mb-4">
-            Your one-stop solution to track income, bills, savings, and tax-deductible expenses.
+            Clarity, confidence, and control over your finances
         </p>
-        <button class="btn btn-lg btn-brand" data-bs-toggle="modal" data-bs-target="#loginPrompt">
+        <button class="btn btn-primary btn-lg btn-brand btn-neon accent-ring" data-bs-toggle="modal" data-bs-target="#loginPrompt">
             Log in to start
         </button>
+        <div class="display-9 mt-3 signUpLink">
+            New to Zenvestify? <a class="link-light text-decoration-underline" href="/signup">Sign up</a>.
+        </div>
+
     </div>
 </section>
 
@@ -26,7 +33,7 @@
             </div>
             <div class="modal-body">
                 <p class="mb-3">Continue to your dashboard and finish setup.</p>
-                <button class="btn btn-brand w-100 mb-2" @onclick='() => Nav.NavigateTo("/login")'>Log in</button>
+                <button class="btn btn-primary btn-brand w-100 mb-2" @onclick='() => Nav.NavigateTo("/login")'>Log in</button>
                 <button class="btn btn-outline-light w-100" data-bs-dismiss="modal">Cancel</button>
             </div>
         </div>
@@ -41,4 +48,6 @@
       const el=document.getElementById("greet");
       if(el) el.textContent = `${g}, ${name} 👋`;
     })();
+
+    const m = new bootstrap.Modal(document.getElementById('loginPrompt'));
 </script>
