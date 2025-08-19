@@ -1,0 +1,63 @@
+/* === Hero Section === */
+.landing-hero {
+	/* pull global tokens */
+	--bg: var(--color-background);
+	--surface: var(--color-surface);
+	--text: var(--color-text);
+	--text-emph: var(--color-text-muted);
+	--primary: var(--color-primary);
+	--primary-hover: var(--color-primary-hover);
+	--shadow-brand: var(--shadow-brand);
+	/* for alpha uses */
+	--primary-rgb: 106,141,255;
+	background: radial-gradient(1200px 600px at 50% -20%, rgba(var(--primary-rgb), .35), transparent), linear-gradient(135deg, var(--bg) 0%, var(--surface) 60%, var(--bg) 100%);
+	color: var(--text);
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	padding: 4rem 1rem;
+}
+
+.hero-heading {
+	font-size: 3rem;
+	font-weight: 700;
+	color: var(--text);
+	text-shadow: 0 2px 10px rgba(0,0,0,.6);
+}
+
+.bottomLevel {
+	color: var(--color-secondary);
+}
+
+.signUpLink {
+	font-size: 0.8rem;
+}
+/* Accent ring effect */
+.accent-ring:focus {
+	box-shadow: 0 0 0 .25rem rgba(var(--primary-rgb), .5);
+}
+
+/* === Modal === */
+.modal-content {
+	background: var(--surface);
+	color: var(--text);
+	border: 1px solid rgba(255,255,255,.08);
+	border-radius: .75rem;
+}
+
+.modal-header {
+	border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.btn-close-white {
+	filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* === Text utilities === */
+.text-light-emphasis {
+	color: var(--text-emph) !important;
+}
+
+
