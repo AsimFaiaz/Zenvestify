@@ -1,0 +1,126 @@
+﻿@page "/signup"
+@layout NotLoggedInLayout
+@inject NavigationManager Nav
+@inject HttpClient Http
+
+<EditForm Model="_vm" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="container py-5" style="max-width:520px;">
+        <h3 class="mb-3">Create your account</h3>
+
+        <div class="card p-4">
+            <div class="mb-3">
+                <label class="form-label">Full name</label>
+                <InputText class="form-control" @bind-Value="_vm.FullName" />
+                <ValidationMessage For="@(() => _vm.FullName)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <InputText type="email" class="form-control" @bind-Value="_vm.Email" />
+                <ValidationMessage For="@(() => _vm.Email)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <InputText type="password" class="form-control" @bind-Value="_vm.Password" />
+                <ValidationMessage For="@(() => _vm.Password)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Confirm password</label>
+                <InputText type="password" class="form-control" @bind-Value="_vm.ConfirmPassword" />
+                <ValidationMessage For="@(() => _vm.ConfirmPassword)" />
+            </div>
+
+            @if(!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="alert alert-danger py-2 mb-3">@_error</div>
+            }
+
+            <button class="btn btn-primary w-100" disabled="@_busy">
+                @(_busy ? "Creating..." : "Create account")
+            </button>
+
+            <div class="text-muted mt-3 text-center">
+                Already have an account? <a href="/login">Log in</a>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    private readonly SignupVm _vm = new();
+    private bool _busy;
+    private string? _error;
+
+    private async Task HandleSubmit()
+    {
+        _error = null;
+
+        if(_vm.Password != _vm.ConfirmPassword)
+        {
+            _error = "Passwords do not match.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            // TODO: replace with your API endpoint
+            // Example payload:
+            var payload = new
+            {
+                fullName = _vm.FullName,
+                email = _vm.Email,
+                password = _vm.Password
+            };
+
+            // POST to backend (adjust URL when your API is ready)
+            var resp = await Http.PostAsJsonAsync("/api/auth/register", payload);
+
+            if(resp.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/dashboard", forceLoad: true);
+                return;
+            }
+
+            // read server error (fallback message)
+            _error = (await resp.Content.ReadAsStringAsync()) switch
+            {
+                var s when !string.IsNullOrWhiteSpace(s) => s,
+                _ => "Registration failed. Please try again."
+            };
+        }
+        catch
+        {
+            // if no API yet, simulate success to continue the flow:
+            Nav.NavigateTo("/dashboard", forceLoad: true);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ViewModel with validation
+    public class SignupVm
+    {
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(2)]
+        public string FullName { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required,
+         System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required,
+         System.ComponentModel.DataAnnotations.MinLength(8)]
+        public string Password { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required,
+         System.ComponentModel.DataAnnotations.MinLength(8)]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}
