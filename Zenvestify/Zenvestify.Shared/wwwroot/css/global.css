@@ -12,6 +12,7 @@
 
 body {
 	font-family: 'Inter', sans-serif;
+	background: unset;
 }
 
 h1, h2, h3, .hero-heading {
