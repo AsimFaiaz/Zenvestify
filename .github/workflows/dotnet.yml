@@ -24,11 +24,14 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Restore Workloads
-      run: dotnet workload restore
+    - name: Restore Shared Library
+      run: dotnet restore Zenvestify/Zenvestify.Shared/Zenvestify.Shared.csproj
 
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.SOLUTION_PATH }}
+    - name: Restore Web Client
+      run: dotnet restore Zenvestify/Zenvestify.Web.Client/Zenvestify.Web.Client.csproj
+
+    - name: Restore Web App
+      run: dotnet restore Zenvestify/Zenvestify.Web/Zenvestify.Web.csproj
     
     - name: Build Web App
       run: dotnet build Zenvestify/Zenvestify.Web/Zenvestify.Web.csproj --configuration Release --no-restore
