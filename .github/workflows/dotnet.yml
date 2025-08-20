@@ -23,7 +23,10 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-    
+
+    - name: Restore Workloads
+      run: dotnet workload restore
+
     - name: Restore dependencies
       run: dotnet restore ${{ env.SOLUTION_PATH }}
     
@@ -38,3 +41,59 @@ jobs:
       with:
         name: web-app
         path: ./web-app
+
+  # Build Android app
+  build-android:
+    name: Build Android
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install MAUI workload
+      run: dotnet workload install maui
+    
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+    
+    - name: Build Android
+      run: dotnet build Zenvestify/Zenvestify/Zenvestify.csproj -f net9.0-android --configuration Release
+    
+    - name: Upload Android artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-app
+        path: '**/bin/Release/net9.0-android/'
+
+  # Build iOS app
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install MAUI workload
+      run: dotnet workload install maui
+    
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+    
+    - name: Build iOS
+      run: dotnet build Zenvestify/Zenvestify/Zenvestify.csproj -f net9.0-ios --configuration Release
+    
+    - name: Upload iOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-app
+        path: '**/bin/Release/net9.0-ios/'
