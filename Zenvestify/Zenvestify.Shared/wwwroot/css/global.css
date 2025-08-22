@@ -6,6 +6,7 @@
 	--color-background: #0f1020;
 	--color-surface: #151a2b;
 	--color-text: #e8eaf1;
+	--color-text-dark: #212121;
 	--color-text-muted: rgba(232,234,241,.8);
 	--shadow-brand: 0 10px 24px rgba(106,141,255,.35);
 }

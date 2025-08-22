@@ -1,0 +1,105 @@
+﻿@page "/login"
+@rendermode InteractiveWebAssembly
+@using Zenvestify.Shared.Layout
+@layout NotLoggedInLayout
+@inject NavigationManager Nav
+@inject HttpClient Http
+
+<EditForm Model="_logIn" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="auth-container">
+        <div class="card auth-card text-center p-4" style="max-width:520px;">
+            <h3>Log in</h3>
+
+            <div class="card p-4">
+
+            <div class="mb-3">
+                <label class="form-label d-flex justify-content-start">Email</label>
+                <InputText type="email" class="form-control" @bind-Value="_logIn.Email" />
+                <ValidationMessage For="@(() => _logIn.Email)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label d-flex justify-content-start">Password</label>
+                <InputText type="password" class="form-control" @bind-Value="_logIn.Password" />
+                <ValidationMessage For="@(() => _logIn.Password)" />
+            </div>
+
+            @if(!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="alert alert-danger py-2 mb-3">@_error</div>
+            }
+
+            <button type="submit" class="btn btn-primary w-100" disabled="@_busy">
+                @(_busy ? "Logging in..." : "Log in")
+            </button>
+
+            <div class="text-muted mt-3 text-center">
+
+                    <a href="/forgotpassword"
+                    class="link-dark text-decoration-underline"
+                       @onclick='() => Nav.NavigateTo("/forgotpassword", forceLoad: true)'>
+                    Forget Password?
+                </a>
+
+                New here? <a href="/signup"
+                                 class="link-dark text-decoration-underline"
+                                 @onclick='() => Nav.NavigateTo("/signup", forceLoad: true)'>
+                Sign up
+            </a>
+            </div>
+        </div>
+      </div>
+   </div>
+</EditForm>
+   
+
+@code{
+    private readonly LoginVm _logIn = new();
+    private bool _busy;
+    private string? _error;
+
+    private async Task HandleSubmit()
+    {
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            // POST to backend (adjust URL when API is ready)
+            var resp = await Http.PostAsJsonAsync("/api/auth/login", _logIn);
+
+            if(resp.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/dashboard", forceLoad: true);
+                return;
+            }
+    
+            _error = await resp.Content.ReadAsStringAsync();
+            if(string.IsNullOrWhiteSpace(_error))
+                _error = "Login failed. Please try again.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+
+    public class LoginVm
+    {
+        [System.ComponentModel.DataAnnotations.Required, 
+         System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required, 
+         System.ComponentModel.DataAnnotations.MinLength(8)]
+        public string Password { get; set; } = string.Empty;
+    }
+}
