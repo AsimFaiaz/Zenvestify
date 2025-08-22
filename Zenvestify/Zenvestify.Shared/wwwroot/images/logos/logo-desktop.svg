@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="36" viewBox="0 0 180 36">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#6a8dff"></stop>
+      <stop offset="1" stop-color="#9b6aff"></stop>
+    </linearGradient>
+  </defs>
+  <!-- mark -->
+  <g transform="translate(4,4)">
+    <rect rx="8" ry="8" width="28" height="28" fill="#0f1020" stroke="url(#g)" stroke-width="2"></rect>
+    <path d="M6 20 L18 8 h-6 l6-6" fill="none" stroke="url(#g)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+  </g>
+  <!-- wordmark -->
+  <text x="44" y="25" font-family="Poppins,Segoe UI,Arial" font-size="18" font-weight="700" fill="#e8eaf1">Zenvestify</text>
+</svg>

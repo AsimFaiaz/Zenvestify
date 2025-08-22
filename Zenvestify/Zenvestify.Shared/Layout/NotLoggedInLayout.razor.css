@@ -1,5 +1,22 @@
 .notLoggedIn-layout {
 	min-height: 100vh;
 	background: #0f1020;
-	color: #e8eaf1
+	color: #e8eaf1;
+	padding-top: 56px;
+}
+
+.auth-header {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	padding: 10px 20px;
+	display: flex;
+	align-items: center;
+	background: transparent;
+	z-index: 10;
+}
+
+.auth-header .brand img {
+	height: 50%;
 }

@@ -1,4 +1,5 @@
 ﻿@page "/"
+@rendermode InteractiveWebAssembly
 @using Zenvestify.Shared.Layout
 @layout NotLoggedInLayout
 @inject NavigationManager Nav
@@ -13,34 +14,24 @@
         <p class="lead text-light-emphasis mb-4">
             Clarity, confidence, and control over your finances
         </p>
-        <button class="btn btn-primary btn-lg btn-brand btn-neon accent-ring" data-bs-toggle="modal" data-bs-target="#loginPrompt">
+        <a href="/login" class="btn btn-primary btn-lg btn-brand btn-neon accent-ring"
+           @onclick='() => Nav.NavigateTo("/login", forceLoad: true)'
+           @onclick:preventDefault="true">
             Log in to start
-        </button>
+        </a>
         <div class="display-9 mt-3 signUpLink">
-            New to Zenvestify? <a class="link-light text-decoration-underline" href="/signup">Sign up</a>.
+            New to Zenvestify?<a href="/signup"
+                                 class="link-light text-decoration-underline"
+                                 @onclick='() => Nav.NavigateTo("/signup", forceLoad: true)'
+                                 @onclick:preventDefault>
+                Sign up
+            </a>
         </div>
-
     </div>
 </section>
 
 
-<div class="modal fade" id="loginPrompt" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background:#151a2b; color:#e8eaf1;">
-            <div class="modal-header border-0">
-                <h5 class="modal-title">Sign in to Zenvestify</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-3">Continue to your dashboard and finish setup.</p>
-                <button class="btn btn-primary btn-brand w-100 mb-2" @onclick='() => Nav.NavigateTo("/login")'>Log in</button>
-                <button class="btn btn-outline-light w-100" data-bs-dismiss="modal">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
+@* <script>
     (function(){
       const h=new Date().getHours();
       const name="User";
@@ -50,4 +41,4 @@
     })();
 
     const m = new bootstrap.Modal(document.getElementById('loginPrompt'));
-</script>
+</script> *@

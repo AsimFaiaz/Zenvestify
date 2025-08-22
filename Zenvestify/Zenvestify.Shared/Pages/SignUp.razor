@@ -1,4 +1,6 @@
 @page "/signup"
+@rendermode InteractiveWebAssembly
+@using Zenvestify.Shared.Layout
 @layout NotLoggedInLayout
 @inject NavigationManager Nav
 @inject HttpClient Http
@@ -7,30 +9,32 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
 
-    <div class="container py-5" style="max-width:520px;">
+
+    <div class="signup-container">
+      <div class="card signup-card text-center p-4">
         <h3 class="mb-3">Create your account</h3>
 
         <div class="card p-4">
             <div class="mb-3">
-                <label class="form-label">Full name</label>
+                 <label class="form-label d-flex justify-content-start">Full name</label>
                 <InputText class="form-control" @bind-Value="_vm.FullName" />
                 <ValidationMessage For="@(() => _vm.FullName)" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Email</label>
+                <label class="form-label d-flex justify-content-start">Email</label>
                 <InputText type="email" class="form-control" @bind-Value="_vm.Email" />
                 <ValidationMessage For="@(() => _vm.Email)" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Password</label>
+                <label class="form-label  d-flex justify-content-start">Password</label>
                 <InputText type="password" class="form-control" @bind-Value="_vm.Password" />
                 <ValidationMessage For="@(() => _vm.Password)" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Confirm password</label>
+                 <label class="form-label  d-flex justify-content-start">Confirm password</label>
                 <InputText type="password" class="form-control" @bind-Value="_vm.ConfirmPassword" />
                 <ValidationMessage For="@(() => _vm.ConfirmPassword)" />
             </div>
@@ -49,6 +53,7 @@
             </div>
         </div>
     </div>
+</div>
 </EditForm>
 
 @code {
@@ -69,8 +74,7 @@
         _busy = true;
         try
         {
-            // TODO: replace with your API endpoint
-            // Example payload:
+            // TODO: replace with API endpoint
             var payload = new
             {
                 fullName = _vm.FullName,
@@ -78,7 +82,7 @@
                 password = _vm.Password
             };
 
-            // POST to backend (adjust URL when your API is ready)
+            // POST to backend (adjust URL when API is ready)
             var resp = await Http.PostAsJsonAsync("/api/auth/register", payload);
 
             if(resp.IsSuccessStatusCode)
