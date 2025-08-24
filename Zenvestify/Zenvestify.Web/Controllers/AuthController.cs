@@ -96,6 +96,44 @@ namespace Zenvestify.Web.Controllers
 			});
 		}
 
+		// POST /api/auth/forgotpassword
+		[HttpPost("forgotpassword")]
+		public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+		{
+			var user = await _userRepository.GetUserByEmailAsync(dto.Email);
+			// Always return OK
+			if (user == null) return Ok();
+
+			// Generate a secure random token
+			var tokenBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+			var token = Convert.ToBase64String(tokenBytes);
+
+			var expires = DateTime.UtcNow.AddMinutes(30);
+			await _userRepository.InsertPasswordResetTokenAsync(user.Id, token, expires);
+
+			// TODO: send email with link:
+			// e.g., https://yourapp/resetpassword?token=URLENCODE(token)
+
+			return Ok();
+		}
+
+
+		// POST /api/auth/resetpassword
+		[HttpPost("resetpassword")]
+		public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+		{
+			var (userId, valid) = await _userRepository.ValidatePasswordResetTokenAsync(dto.Token);
+			if (!valid) return BadRequest("Invalid or expired token.");
+
+			// hash the new password
+			var hashed = _passwordHasher.HashPassword(null, dto.NewPassword);
+
+			await _userRepository.UpdatePasswordHashAsync(userId, hashed);
+			await _userRepository.MarkPasswordResetTokenUsedAsync(dto.Token);
+
+			return Ok("Password updated.");
+		}
+
 		[Authorize]
 		[HttpGet("me")]
 		public IActionResult Me()
@@ -122,4 +160,16 @@ namespace Zenvestify.Web.Controllers
 		public string Email { get; set; } = string.Empty;
 		public string Password { get; set; } = string.Empty;
 	}
+
+	//dto forgot and reset password
+	public class ForgotPasswordDto 
+	{ 
+		public string Email { get; set; } = ""; 
+	}
+	public class ResetPasswordDto 
+	{ 
+		public string Token { get; set; } = "";
+		public string NewPassword { get; set; } = "";
+	}
+
 }
