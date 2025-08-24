@@ -1,0 +1,20 @@
+﻿@* This is a demo page to verify token from frontend *@
+
+@page "/me"
+@inject Zenvestify.Shared.Services.AuthService Auth
+
+<h3>Who am I?</h3>
+
+<button @onclick="CallMe">Call /auth/me</button>
+
+<p>@_result</p>
+
+@code {
+    private string _result = "";
+
+    private async Task CallMe()
+    {
+        var res = await Auth.GetMeAsync();
+        _result = await res.Content.ReadAsStringAsync();
+    }
+}

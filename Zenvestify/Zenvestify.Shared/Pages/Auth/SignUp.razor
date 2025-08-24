@@ -1,20 +1,19 @@
 @page "/signup"
-@rendermode InteractiveWebAssembly
+@* @rendermode InteractiveWebAssembly *@
 @using Zenvestify.Shared.Layout
+@using System.ComponentModel.DataAnnotations
 @layout NotLoggedInLayout
 @inject NavigationManager Nav
-@inject HttpClient Http
+@inject Zenvestify.Shared.Services.AuthService Auth
 
-<EditForm Model="_vm" OnValidSubmit="HandleSubmit">
+<EditForm FormName="signupForm" Model="_vm" OnValidSubmit="HandleSubmit">
     <DataAnnotationsValidator />
-    <ValidationSummary />
-
 
     <div class="signup-container">
       <div class="card signup-card text-center p-4">
         <h3 class="mb-3">Create your account</h3>
-
         <div class="card p-4">
+
             <div class="mb-3">
                  <label class="form-label d-flex justify-content-start">Full name</label>
                 <InputText class="form-control" @bind-Value="_vm.FullName" />
@@ -44,7 +43,7 @@
                 <div class="alert alert-danger py-2 mb-3">@_error</div>
             }
 
-            <button class="btn btn-primary w-100" disabled="@_busy">
+                <button type="submit" class="btn btn-primary w-100" disabled="@_busy">
                 @(_busy ? "Creating..." : "Create account")
             </button>
 
@@ -56,6 +55,7 @@
 </div>
 </EditForm>
 
+
 @code {
     private readonly SignupVm _vm = new();
     private bool _busy;
@@ -64,44 +64,24 @@
     private async Task HandleSubmit()
     {
         _error = null;
-
-        if(_vm.Password != _vm.ConfirmPassword)
-        {
-            _error = "Passwords do not match.";
-            return;
-        }
-
         _busy = true;
+
         try
         {
-            // TODO: replace with API endpoint
-            var payload = new
+            var (ok, err) = await Auth.RegisterAsync(_vm.FullName, _vm.Email, _vm.Password);
+            if (ok)
             {
-                fullName = _vm.FullName,
-                email = _vm.Email,
-                password = _vm.Password
-            };
-
-            // POST to backend (adjust URL when API is ready)
-            var resp = await Http.PostAsJsonAsync("/api/auth/register", payload);
-
-            if(resp.IsSuccessStatusCode)
-            {
-                Nav.NavigateTo("/dashboard", forceLoad: true);
-                return;
+                // after signup, send to login to get a token
+                Nav.NavigateTo("/login", forceLoad: true);
             }
-
-            // read server error (fallback message)
-            _error = (await resp.Content.ReadAsStringAsync()) switch
+            else
             {
-                var s when !string.IsNullOrWhiteSpace(s) => s,
-                _ => "Registration failed. Please try again."
-            };
+                _error = string.IsNullOrWhiteSpace(err) ? "Registration failed. Please try again." : err;
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // if no API yet, simulate success to continue the flow:
-            Nav.NavigateTo("/dashboard", forceLoad: true);
+            _error = $"Registration error: {ex.Message}";
         }
         finally
         {
@@ -109,22 +89,21 @@
         }
     }
 
-    // ViewModel with validation
     public class SignupVm
     {
-        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(2)]
+        [Required, MinLength(2)]
+        [Display(Name = "Full Name")]
         public string FullName { get; set; } = "";
 
-        [System.ComponentModel.DataAnnotations.Required,
-         System.ComponentModel.DataAnnotations.EmailAddress]
+        [Required, EmailAddress]
+        [Display(Name = "Email Address")]
         public string Email { get; set; } = "";
 
-        [System.ComponentModel.DataAnnotations.Required,
-         System.ComponentModel.DataAnnotations.MinLength(8)]
+        [Required, MinLength(8)]
         public string Password { get; set; } = "";
 
-        [System.ComponentModel.DataAnnotations.Required,
-         System.ComponentModel.DataAnnotations.MinLength(8)]
+        [Required, MinLength(8), Compare(nameof(Password), ErrorMessage = "Passwords did not match")]
+        [Display(Name = "Confirm Password")]
         public string ConfirmPassword { get; set; } = "";
     }
 }

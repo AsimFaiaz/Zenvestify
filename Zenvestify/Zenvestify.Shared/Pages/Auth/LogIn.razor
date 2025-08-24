@@ -1,13 +1,13 @@
 ﻿@page "/login"
 @rendermode InteractiveWebAssembly
 @using Zenvestify.Shared.Layout
+@using System.ComponentModel.DataAnnotations
 @layout NotLoggedInLayout
 @inject NavigationManager Nav
-@inject HttpClient Http
+@inject Zenvestify.Shared.Services.AuthService Auth
 
-<EditForm Model="_logIn" OnValidSubmit="HandleSubmit">
+<EditForm FormName="loginForm" Model="_logIn" OnValidSubmit="HandleSubmit">
     <DataAnnotationsValidator />
-    <ValidationSummary />
 
     <div class="auth-container">
         <div class="card auth-card text-center p-4" style="max-width:520px;">
@@ -68,18 +68,17 @@
 
         try
         {
-            // POST to backend (adjust URL when API is ready)
-            var resp = await Http.PostAsJsonAsync("/api/auth/login", _logIn);
+            var (ok, err) = await Auth.LoginAsync(_logIn.Email, _logIn.Password);
 
-            if(resp.IsSuccessStatusCode)
+            if (ok)
             {
                 Nav.NavigateTo("/dashboard", forceLoad: true);
-                return;
             }
-    
-            _error = await resp.Content.ReadAsStringAsync();
-            if(string.IsNullOrWhiteSpace(_error))
-                _error = "Login failed. Please try again.";
+
+            else
+            {
+                _error = string.IsNullOrWhiteSpace(err) ? "Login failed. Please try again." : err;
+            }
         }
         catch (Exception ex)
         {
@@ -94,12 +93,12 @@
 
     public class LoginVm
     {
-        [System.ComponentModel.DataAnnotations.Required, 
-         System.ComponentModel.DataAnnotations.EmailAddress]
-        public string Email { get; set; } = string.Empty;
+        [Required, EmailAddress]
+        [Display(Name = "Email Address")]
+        public string Email { get; set; } = "";
 
-        [System.ComponentModel.DataAnnotations.Required, 
-         System.ComponentModel.DataAnnotations.MinLength(8)]
-        public string Password { get; set; } = string.Empty;
+        [Required, MinLength(8)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
     }
 }
