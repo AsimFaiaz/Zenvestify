@@ -63,5 +63,13 @@ namespace Zenvestify.Web.Data
 			using var conn = new SqlConnection(_connectionString);
 			return await conn.ExecuteAsync(sql, new { Hash = newHash, UserId = userId });
 		}
+
+		public async Task<User?> GetUserByIdAsync(Guid id)
+		{
+			const string sql = "SELECT * FROM Users WHERE Id = @Id AND IsActive = 1";
+			using var conn = new SqlConnection(_connectionString);
+			await conn.OpenAsync();
+			return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Id = id });
+		}
 	}
 }

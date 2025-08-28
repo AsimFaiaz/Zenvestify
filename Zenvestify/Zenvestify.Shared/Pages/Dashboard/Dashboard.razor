@@ -1,0 +1,137 @@
+﻿@page "/dashboard"
+@using System.IdentityModel.Tokens.Jwt
+@using System.Security.Claims
+@using Microsoft.IdentityModel.JsonWebTokens
+@using Zenvestify.Shared.Layout
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using static System.Net.WebRequestMethods
+@layout MainLayout
+@inject NavigationManager Nav
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject Zenvestify.Shared.Services.AuthService Auth
+
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dash-header">
+        <h2>@Greeting, @FullName</h2>
+    </div>
+
+    <!-- GRID LAYOUT -->
+    <section class="dashboard-grid">
+        <!-- KPIs -->
+        <div class="card"><header>Income</header><div class="value">$2,000</div><canvas id="sparkIncome"></canvas></div>
+        <div class="card"><header>Expenses</header><div class="value">$640</div><canvas id="sparkExpense"></canvas></div>
+        <div class="card"><header>Savings</header><div class="value">42%</div><canvas id="sparkSavings"></canvas></div>
+        <div class="card"><header>Tax Paid</header><div class="value">$5,200</div><canvas id="sparkTax"></canvas></div>
+
+        <!-- Mid charts -->
+        <div class="card span-2">
+            <header>Spending Categories</header>
+            <canvas id="pieCategories"></canvas>
+        </div>
+
+        <div class="card">
+            <header>Upcoming Bills</header>
+            <ul class="bills">
+                <li><b>Rent</b><span>$1,200</span><em>3d</em></li>
+                <li><b>Gym</b><span>$25</span><em>4d</em></li>
+                <li><b>Netflix</b><span>$20</span><em>10d</em></li>
+                <li><b>Mobile</b><span>$35</span><em>13d</em></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <header>Recent Activity</header>
+            <ul class="history">
+                <li><span class="pill ok">Paid</span> Salary +$4,200</li>
+                <li><span class="pill neutral">Expense</span> Groceries -$180</li>
+                <li><span class="pill warn">Due</span> Internet $60</li>
+                <li><span class="pill ok">Saved</span> Holiday Fund +$100</li>
+            </ul>
+        </div>
+
+        <!-- Bottom wide chart -->
+        <div class="card span-4">
+            <header>Cash Flow (Income vs Expenses)</header>
+            <canvas id="trendIncomeExpense"></canvas>
+        </div>
+    </section>
+</div>
+
+
+@code {
+    private string FullName = "there";
+    private string Greeting = "Hello";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("[Dashboard] OnInitializedAsync start");
+        Console.WriteLine("[Dashboard] Current Token=" + (Auth.Token ?? "NULL"));
+        Console.WriteLine("[Dashboard] Current Auth Header=" + Http.DefaultRequestHeaders.Authorization);
+
+
+        try
+        {
+            await Auth.WhenReady;
+
+            var response = await Auth.GetMeAsync();
+
+            Console.WriteLine($"[Dashboard] GET /api/auth/me -> Status={response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var user = await response.Content.ReadFromJsonAsync<UserDto>();
+
+                Console.WriteLine($"[Dashboard] Me() returned: Id={user?.Id}, Name={user?.FullName}, Email={user?.Email}");
+
+                if (user != null && !string.IsNullOrWhiteSpace(user.FullName))
+                    FullName = user.FullName.Split(' ')[0];
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[Dashboard] ERROR Body={body}");
+
+            }
+        }
+        catch
+        {
+
+            FullName = "there";
+        }
+
+        var hour = DateTime.Now.Hour;
+        Greeting = hour switch
+        {
+            >= 5 and < 12 => "Good morning",
+            >= 12 and < 18 => "Good afternoon",
+            _ => "Good evening"
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("ZvCharts.initAll");
+        }
+    }
+
+    private class UserDto
+    {
+        public string Id { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+    }
+
+ 
+    // TODO: DELETE when replace with real queries
+    private readonly decimal IncomeThisCycle = 2000m;
+    private readonly decimal ExpensesThisCycle = 640m;
+    private readonly decimal SavingsProgress = 0.42m;
+    private readonly decimal TaxPaidYTD = 5200m;
+}
+
+<script src="_content/Zenvestify.Shared/js/dashboard.js"></script>

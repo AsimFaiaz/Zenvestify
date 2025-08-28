@@ -1,11 +1,14 @@
-using Zenvestify.Shared.Services;
-using Zenvestify.Web.Components;
-using Zenvestify.Web.Data;
-using Zenvestify.Web.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System;
+using System.Runtime.Intrinsics.Arm;
 using System.Text;
+using Zenvestify.Shared.Services;
+using Zenvestify.Web.Components;
 using Zenvestify.Web.Configs;
+using Zenvestify.Web.Data;
+using Zenvestify.Web.Models;
+using Zenvestify.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,29 +59,39 @@ builder.Services.AddHttpClient();
 //Json Token builder
 //var jwtSettings = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddAuthorization();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-	.AddJwtBearer(options =>
-	{
-		var jwtSection = builder.Configuration.GetSection("Jwt");
-		var jwtOptions = jwtSection.Get<JwtOptions>();
+.AddJwtBearer(options =>
+{
+	var jwtSection = builder.Configuration.GetSection("Jwt");
+	var jwtOptions = jwtSection.Get<JwtOptions>();
 
-		options.TokenValidationParameters = new TokenValidationParameters
-		{
-			ValidateIssuer = true,
-			ValidateAudience = true,
-			ValidateLifetime = true,
-			ValidateIssuerSigningKey = true,
-			ValidIssuer = jwtOptions.Issuer,
-			ValidAudience = jwtOptions.Audience,
-			IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
-		};
-	});
+	options.TokenValidationParameters = new TokenValidationParameters
+	{
+		ValidateIssuer = true,
+		ValidateAudience = true,
+		ValidateLifetime = true,
+		ValidateIssuerSigningKey = true,
+		ValidIssuer = jwtOptions.Issuer,
+		ValidAudience = jwtOptions.Audience,
+		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
+	};
+});
 
 //Register service
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserRepository>();
 
 var app = builder.Build();
+
+
+app.Use(async (context, next) =>
+{
+	var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+	Console.WriteLine($"[SERVER.Middleware] Incoming {context.Request.Method} {context.Request.Path} | Auth={authHeader}");
+	await next();
+});
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -93,6 +106,12 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+//builder.Services.AddScoped(sp => new HttpClient
+//{
+//	BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+//});
+
 
 app.UseHttpsRedirection();
 
