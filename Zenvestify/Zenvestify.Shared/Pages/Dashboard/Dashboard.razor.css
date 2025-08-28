@@ -1,0 +1,76 @@
+﻿.card canvas {
+    /*needs changing specific grapoh based*/
+    width: 100% !important;
+    height: 60px !important;
+    max-width: 200px;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.card {
+    background: #1e2230;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 120px;
+}
+
+    .card.span-2 {
+        grid-column: span 2;
+    }
+
+    .card.span-4 {
+        grid-column: span 4;
+    }
+
+    .card header {
+        font-size: .9rem;
+        color: #aaa;
+        margin-bottom: .5rem;
+    }
+
+    .card .value {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #fff;
+    }
+
+    .card ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+        .card ul li {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: .5rem;
+            color: #ccc;
+        }
+
+.pill {
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: .7rem;
+    color: #fff;
+    margin-right: .5rem;
+}
+
+    .pill.ok {
+        background: #2ecc71;
+    }
+
+    .pill.warn {
+        background: #f39c12;
+    }
+
+    .pill.neutral {
+        background: #3498db;
+    }
