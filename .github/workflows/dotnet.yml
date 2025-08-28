@@ -1,0 +1,106 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  SOLUTION_PATH: 'Zenvestify.sln'
+
+jobs:
+  # Build Web
+  build-web:
+    name: Build Web App
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore Shared Library
+      run: dotnet restore Zenvestify/Zenvestify.Shared/Zenvestify.Shared.csproj
+
+    - name: Restore Web Client
+      run: dotnet restore Zenvestify/Zenvestify.Web.Client/Zenvestify.Web.Client.csproj
+
+    - name: Restore Web App
+      run: dotnet restore Zenvestify/Zenvestify.Web/Zenvestify.Web.csproj
+    
+    - name: Build Web App
+      run: dotnet build Zenvestify/Zenvestify.Web/Zenvestify.Web.csproj --configuration Release --no-restore
+    
+    - name: Publish Web App
+      run: dotnet publish Zenvestify/Zenvestify.Web/Zenvestify.Web.csproj --configuration Release --output ./web-app
+    
+    - name: Upload web artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-app
+        path: ./web-app
+
+  # Build Android app
+  build-android:
+    name: Build Android
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install MAUI workload
+      run: dotnet workload install maui
+    
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+    
+    - name: Build Android
+      run: dotnet build Zenvestify/Zenvestify/Zenvestify.csproj -f net9.0-android --configuration Release
+    
+    - name: Upload Android artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-app
+        path: '**/bin/Release/net9.0-android/'
+
+  # Build iOS app
+  build-ios:
+    name: Build iOS
+    runs-on: macos-15
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install MAUI Workloads
+      run: |
+          dotnet workload install ios --ignore-failed-sources
+          dotnet workload install maui --ignore-failed-sources
+          
+    - name: Select Xcode 16.4
+      run: sudo xcode-select -s /Applications/Xcode_16.4.app
+    
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+    
+    - name: Build iOS
+      run: dotnet build Zenvestify/Zenvestify/Zenvestify.csproj -f net9.0-ios --configuration Release
+    
+    - name: Upload iOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-app
+        path: '**/bin/Release/net9.0-ios/'
