@@ -1,8 +1,8 @@
 ﻿@page "/"
-@rendermode InteractiveWebAssembly
 @using Zenvestify.Shared.Layout
 @layout NotLoggedInLayout
 @inject NavigationManager Nav
+@inject Zenvestify.Shared.Services.AuthService Auth
 
 <section class="landing-hero bg-grid text-center py-5">
     <div class="container">
@@ -14,11 +14,22 @@
         <p class="lead text-light-emphasis mb-4">
             Clarity, confidence, and control over your finances
         </p>
-        <a href="/login" class="btn btn-primary btn-lg btn-brand btn-neon accent-ring"
-           @onclick='() => Nav.NavigateTo("/login", forceLoad: true)'
-           @onclick:preventDefault="true">
-            Log in to start
-        </a>
+        @if (isLoggedIn)
+        {
+            <a href="/dashboard" class="btn btn-success btn-lg btn-brand btn-neon accent-ring"
+               @onclick='() => Nav.NavigateTo("/dashboard", forceLoad: true)'
+               @onclick:preventDefault="true">
+                Go to dashboard
+            </a>
+        }
+        else
+        {
+            <a href="/login" class="btn btn-primary btn-lg btn-brand btn-neon accent-ring"
+               @onclick='() => Nav.NavigateTo("/login", forceLoad: true)'
+               @onclick:preventDefault="true">
+                Log in to start
+            </a>
+        }
         <div class="display-9 mt-3 signUpLink">
             New to Zenvestify?<a href="/signup"
                                  class="link-light text-decoration-underline"
@@ -31,14 +42,16 @@
 </section>
 
 
-@* <script>
-    (function(){
-      const h=new Date().getHours();
-      const name="User";
-      const g = h<12?"Good morning":(h<18?"Good afternoon":"Good evening");
-      const el=document.getElementById("greet");
-      if(el) el.textContent = `${g}, ${name} 👋`;
-    })();
+@code {
+    private bool isLoggedIn;
 
-    const m = new bootstrap.Modal(document.getElementById('loginPrompt'));
-</script> *@
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await Auth.GetMeAsync();
+        isLoggedIn = !string.IsNullOrWhiteSpace(Auth.Token);
+
+        Console.WriteLine($"[LandingPage] GET /api/auth/me -> Status={isLoggedIn}");
+    }
+}

@@ -1,5 +1,4 @@
 ﻿@page "/login"
-@rendermode InteractiveWebAssembly
 @using Zenvestify.Shared.Layout
 @using System.ComponentModel.DataAnnotations
 @layout NotLoggedInLayout
@@ -33,7 +32,7 @@
             }
 
             <button type="submit" class="btn btn-primary w-100" disabled="@_busy">
-                @(_busy ? "Logging in..." : "Log in")
+                    @(_busy ? "Logging in..." : "Log in")
             </button>
 
             <div class="text-muted mt-3 text-center">
@@ -60,9 +59,13 @@
     private readonly LoginVm _logIn = new();
     private bool _busy;
     private string? _error;
+    private bool isLoggedIn = false;
 
     private async Task HandleSubmit()
     {
+
+        Console.WriteLine("HandleSubmit called");
+
         _busy = true;
         _error = null;
 
@@ -72,6 +75,7 @@
 
             if (ok)
             {
+                isLoggedIn = true;
                 Nav.NavigateTo("/dashboard", forceLoad: true);
             }
 
@@ -97,7 +101,8 @@
         [Display(Name = "Email Address")]
         public string Email { get; set; } = "";
 
-        [Required, MinLength(8)]
+        //TODO: CHANGE MIN LENGTH TO 8
+        [Required, MinLength(1)]
         [Display(Name = "Password")]
         public string Password { get; set; } = "";
     }

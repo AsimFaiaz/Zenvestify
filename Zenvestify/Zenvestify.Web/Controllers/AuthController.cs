@@ -38,10 +38,8 @@ namespace Zenvestify.Web.Controllers
 				return BadRequest("User already exists with this email.");
 			}
 
-			//hash password
 			string hashedPassword = _passwordHasher.HashPassword(null, request.Password);
 
-			//create new user
 			var User = new User
 			{
 				FullName = request.FullName,
@@ -57,16 +55,23 @@ namespace Zenvestify.Web.Controllers
 		[HttpPost("login")]
 		public async Task<IActionResult> Login([FromBody] UserLoginDto request)
 		{
+			Console.WriteLine($"[AuthController.Login] Login attempt: {request.Email}");
+
 			var user = await _userRepository.GetUserByEmailAsync(request.Email);
 
-			if(user == null)
+			Console.WriteLine($"[AuthController.Login] User found? {user != null}");
+
+
+			if (user == null)
 			{
 				return Unauthorized(new { message = "Invalid email or password." });
 			}
 
 			var verify = _passwordHasher.VerifyHashedPassword(null, user.PasswordHash, request.Password);
 
-			if(verify != PasswordVerificationResult.Success)
+			Console.WriteLine($"[AuthController.Login] Password check: {verify}");
+
+			if (verify != PasswordVerificationResult.Success)
 			{
 				return Unauthorized(new { message = "Invalid email or password." });
 			}
@@ -88,6 +93,10 @@ namespace Zenvestify.Web.Controllers
 				expires: DateTime.UtcNow.AddMinutes(_jwtOptions.ExpireMinutes),
 				signingCredentials: creds
 			);
+
+
+			Console.WriteLine($"[AuthController.Login] Token issued: {token}...");
+
 
 			var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 			return Ok(new
@@ -134,16 +143,42 @@ namespace Zenvestify.Web.Controllers
 			return Ok("Password updated.");
 		}
 
-		[Authorize]
 		[HttpGet("me")]
-		public IActionResult Me()
+		[Authorize] 
+		public async Task<IActionResult> Me()
 		{
-			var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-			var email = User.FindFirstValue(ClaimTypes.Email);
-			var name = User.FindFirst("FullName")?.Value;
 
-			return Ok(new {userId, email, name});
+			Console.WriteLine("[AuthController.Me] Hit /api/auth/me");
+
+			var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+			var email = User.FindFirst(ClaimTypes.Email)?.Value;
+			var name = User.FindFirst(ClaimTypes.Name)?.Value;
+
+			Console.WriteLine($"[AuthController.Me] Claims => Id={userId}, Email={email}, Name={name}");
+
+			if (string.IsNullOrEmpty(userId))
+				return Unauthorized();
+
+			var user = await _userRepository.GetUserByIdAsync(Guid.Parse(userId));
+
+			Console.WriteLine($"[AuthController.Me] DB User => {user?.FullName}");
+
+			if (user == null || !user.isActive) return NotFound();
+
+			Console.WriteLine("JWT NameIdentifier: " + userId);
+
+			return Ok(new
+			{
+				user.Id,
+				user.FullName,
+				user.Email
+			});
+
+
+			
 		}
+
+
 	}
 
 	//dto to keep request clean
