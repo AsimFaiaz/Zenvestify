@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CommunityToolkit.Maui;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Zenvestify.Services;
 using Zenvestify.Shared.Services;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Zenvestify
 {
@@ -12,6 +13,7 @@ namespace Zenvestify
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseMauiCommunityToolkit()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
