@@ -1,5 +1,5 @@
 ﻿document.addEventListener("DOMContentLoaded", () => {
-    console.log("dashboard.js loaded ✅");
+    //console.log("dashboard.js loaded");
 
     window.ZvCharts = (() => {
         const cache = {}; // id -> Chart instance
@@ -66,7 +66,6 @@
             mkBar('trendIncomeExpense', [2, 2, 2, 2, 2, 2], [0.7, 1.0, 0.8, 1.2, 0.9, 0.95]);
         }
 
-        // ✅ expose public API
         return { initAll };
 
     })();

@@ -16,7 +16,7 @@
         </p>
         @if (isLoggedIn)
         {
-            <a href="/dashboard" class="btn btn-success btn-lg btn-brand btn-neon accent-ring"
+            <a href="/dashboard" class="btn btn-primary btn-lg btn-brand btn-neon accent-ring"
                @onclick='() => Nav.NavigateTo("/dashboard", forceLoad: true)'
                @onclick:preventDefault="true">
                 Go to dashboard

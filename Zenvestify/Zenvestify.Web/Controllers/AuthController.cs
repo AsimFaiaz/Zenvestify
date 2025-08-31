@@ -151,19 +151,20 @@ namespace Zenvestify.Web.Controllers
 			Console.WriteLine("[AuthController.Me] Hit /api/auth/me");
 
 			var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-			var email = User.FindFirst(ClaimTypes.Email)?.Value;
-			var name = User.FindFirst(ClaimTypes.Name)?.Value;
-
-			Console.WriteLine($"[AuthController.Me] Claims => Id={userId}, Email={email}, Name={name}");
 
 			if (string.IsNullOrEmpty(userId))
 				return Unauthorized();
 
 			var user = await _userRepository.GetUserByIdAsync(Guid.Parse(userId));
-
-			Console.WriteLine($"[AuthController.Me] DB User => {user?.FullName}");
-
 			if (user == null || !user.isActive) return NotFound();
+
+			var profile = await _userRepository.GetUserProfileAsync(Guid.Parse(userId));
+			if(profile == null)
+			{
+				// create profile if not exist
+				await _userRepository.CreateUserProfileAsync(Guid.Parse(userId));
+				profile = await _userRepository.GetUserProfileAsync(Guid.Parse(userId));
+			}
 
 			Console.WriteLine("JWT NameIdentifier: " + userId);
 
@@ -171,14 +172,10 @@ namespace Zenvestify.Web.Controllers
 			{
 				user.Id,
 				user.FullName,
-				user.Email
-			});
-
-
-			
+				user.Email,
+				OnboardingStatus = profile?.OnboardingStatus ?? 0
+			});	
 		}
-
-
 	}
 
 	//dto to keep request clean
