@@ -1,6 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
-using Dapper;
+﻿using Dapper;
+using Microsoft.Data.SqlClient;
 using Zenvestify.Web.Models;
+using static Zenvestify.Shared.Models.UserProfileDtos;
 
 namespace Zenvestify.Web.Data
 {
@@ -64,6 +65,185 @@ namespace Zenvestify.Web.Data
 			return await conn.ExecuteAsync(sql, new { Hash = newHash, UserId = userId });
 		}
 
+		//Create user profile - After login for first time
+		public async Task<int> CreateUserProfileAsync(Guid userId)
+		{
+			const string sql = @"INSERT INTO UserProfile (UserId, Currency, Timezone, OnboardingStatus)
+                         VALUES (@UserId, 'AUD', NULL, 0)";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.ExecuteAsync(sql, new { UserId = userId });
+		}
+
+		//Get user profile
+		public async Task<UserProfile?> GetUserProfileAsync(Guid userId)
+		{
+			const string sql = "SELECT * FROM UserProfile WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryFirstOrDefaultAsync<UserProfile>(sql, new { UserId = userId });
+		}
+
+		//Onboarding status update
+		public async Task<int> UpdateOnboardingStatusAsync(Guid userId, int status)
+		{
+			const string sql = @"UPDATE UserProfile SET OnboardingStatus = @Status WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.ExecuteAsync(sql, new { UserId = userId, Status = status });
+		}
+
+		//More than 1 income sources
+		public async Task AddOtherIncomeAsync(Guid userId, string source, decimal amount, string frequency)
+		{
+			const string sql = @"INSERT INTO OtherIncome (UserId, Source, Amount, Frequency) 
+                         VALUES (@UserId, @Source, @Amount, @Frequency)";
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { UserId = userId, Source = source, Amount = amount, Frequency = frequency });
+		}
+
+		public async Task<IEnumerable<dynamic>> GetOtherIncomeAsync(Guid userId)
+		{
+			const string sql = @"SELECT * FROM OtherIncome WHERE UserId=@UserId ORDER BY CreatedAt DESC";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryAsync(sql, new { UserId = userId });
+		}
+
+		//Daily expenses tracking
+		public async Task AddExpenseAsync(Guid userId, string category, decimal amount, DateTime dateSpent, string? notes, bool taxDeductible, bool workRelated)
+		{
+			const string sql = @"INSERT INTO Expenses (UserId, Category, Amount, DateSpent, Notes, IsTaxDeductible, IsWorkRelated) 
+                         VALUES (@UserId, @Category, @Amount, @DateSpent, @Notes, @IsTaxDeductible, @IsWorkRelated)";
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { UserId = userId, Category = category, Amount = amount, DateSpent = dateSpent, Notes = notes, IsTaxDeductible = taxDeductible, IsWorkRelated = workRelated });
+		}
+
+		public async Task<IEnumerable<dynamic>> GetExpensesAsync(Guid userId, DateTime? from = null, DateTime? to = null)
+		{
+			var sql = @"SELECT * FROM Expenses WHERE UserId=@UserId";
+			if (from.HasValue && to.HasValue)
+				sql += " AND DateSpent BETWEEN @From AND @To";
+
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryAsync(sql, new { UserId = userId, From = from, To = to });
+		}
+
+		//Primary income
+		public async Task SetIncomeAsync(Guid userId, string payFrequency, decimal? netPayPerCycle, decimal? grossPayPerCycle, decimal? taxWithheld)
+		{
+			const string sql = @"
+                MERGE IncomeSettings AS target
+                USING (SELECT @UserId AS UserId) AS source
+                ON target.UserId = source.UserId
+                WHEN MATCHED THEN
+                    UPDATE SET PayFrequency = @PayFrequency,
+                               NetPayPerCycle = @NetPayPerCycle,
+                               GrossPayPerCycle = @GrossPayPerCycle,
+							   TaxWithheld = @TaxWithheld
+                WHEN NOT MATCHED THEN
+                    INSERT (UserId, PayFrequency, NetPayPerCycle, GrossPayPerCycle, TaxWithheld)
+                    VALUES (@UserId, @PayFrequency, @NetPayPerCycle, @GrossPayPerCycle, @TaxWithheld);";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { userId, payFrequency, netPayPerCycle, grossPayPerCycle, taxWithheld });
+		}
+
+		public async Task<IncomeSettings?> GetIncomeAsync(Guid userId)
+		{
+			const string sql = "SELECT * FROM IncomeSettings WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryFirstOrDefaultAsync<IncomeSettings>(sql, new { userId });
+		}
+
+		//Savings
+		public async Task AddSavingsGoalAsync(Guid userId, string name, decimal targetAmount, DateTime? targetDate)
+		{
+			const string sql = @"INSERT INTO SavingsGoals (UserId, Name, TargetAmount, TargetDate)
+                                 VALUES (@userId, @name, @targetAmount, @targetDate)";
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { userId, name, targetAmount, targetDate });
+		}
+
+		public async Task<IEnumerable<SavingsGoal>> GetSavingsGoalsAsync(Guid userId)
+		{
+			const string sql = "SELECT * FROM SavingsGoals WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryAsync<SavingsGoal>(sql, new { userId });
+		}
+
+		//Bills
+		public async Task AddBillAsync(Guid userId, string name, decimal amount, string frequency, DateTime firstDueDate)
+		{
+			const string sql = @"INSERT INTO Bills (UserId, Name, Amount, Frequency, FirstDueDate)
+                                 VALUES (@userId, @name, @amount, @frequency, @firstDueDate)";
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { userId, name, amount, frequency, firstDueDate });
+		}
+
+		public async Task<IEnumerable<Bill>> GetBillsAsync(Guid userId)
+		{
+			const string sql = "SELECT * FROM Bills WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryAsync<Bill>(sql, new { userId });
+		}
+
+		//Loans
+		public async Task AddLoanAsync(Guid userId, LoanDto dto)
+		{
+			var sql = @"INSERT INTO Loans
+                (UserId, Name, Principal, InterestRate, RepaymentAmount, RepaymentFrequency,
+                 RemainingBalance, RemainingTermMonths, AmountPaidSoFar, StartDate)
+                VALUES (@UserId, @Name, @Principal, @InterestRate, @RepaymentAmount,
+                        @RepaymentFrequency, @RemainingBalance, @RemainingTermMonths,
+                        @AmountPaidSoFar, @StartDate)";
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new
+			{
+				UserId = userId,
+				dto.Name,
+				dto.Principal,
+				dto.InterestRate,
+				dto.RepaymentAmount,
+				dto.RepaymentFrequency,
+				dto.RemainingBalance,
+				dto.RemainingTermMonths,
+				dto.AmountPaidSoFar,
+				dto.StartDate
+			});
+		}
+
+		public async Task<IEnumerable<LoanAccount>> GetLoansAsync(Guid userId)
+		{
+			var sql = "SELECT * FROM Loans WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryAsync<LoanAccount>(sql, new { UserId = userId });
+		}
+
+
+		//Tax settings
+		public async Task SetTaxSettingsAsync(Guid userId, decimal? taxWithheldPerCycle, bool medicareLevyExempt, bool privateHealthCover)
+		{
+			const string sql = @"
+                MERGE TaxSettings AS target
+                USING (SELECT @UserId AS UserId) AS source
+                ON target.UserId = source.UserId
+                WHEN MATCHED THEN
+                    UPDATE SET TaxWithheldPerCycle = @taxWithheldPerCycle,
+                               MedicareLevyExempt = @medicareLevyExempt,
+                               PrivateHealthCover = @privateHealthCover
+                WHEN NOT MATCHED THEN
+                    INSERT (UserId, TaxWithheldPerCycle, MedicareLevyExempt, PrivateHealthCover)
+                    VALUES (@UserId, @taxWithheldPerCycle, @medicareLevyExempt, @privateHealthCover);";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { userId, taxWithheldPerCycle, medicareLevyExempt, privateHealthCover });
+		}
+
+		public async Task<TaxSettings?> GetTaxSettingsAsync(Guid userId)
+		{
+			const string sql = "SELECT * FROM TaxSettings WHERE UserId = @UserId";
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryFirstOrDefaultAsync<TaxSettings>(sql, new { userId });
+		}
+
+		//me
 		public async Task<User?> GetUserByIdAsync(Guid id)
 		{
 			const string sql = "SELECT * FROM Users WHERE Id = @Id AND IsActive = 1";

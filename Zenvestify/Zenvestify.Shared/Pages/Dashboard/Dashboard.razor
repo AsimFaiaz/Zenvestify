@@ -13,57 +13,64 @@
 @inject Zenvestify.Shared.Services.AuthService Auth
 
 <div class="dashboard">
-    <!-- Header -->
     <div class="dash-header">
-        <h2>@Greeting, @FullName</h2>
+        <h2>@Greeting, @FullName 👋</h2>
     </div>
 
-    <!-- GRID LAYOUT -->
-    <section class="dashboard-grid">
-        <!-- KPIs -->
-        <div class="card"><header>Income</header><div class="value">$2,000</div><canvas id="sparkIncome"></canvas></div>
-        <div class="card"><header>Expenses</header><div class="value">$640</div><canvas id="sparkExpense"></canvas></div>
-        <div class="card"><header>Savings</header><div class="value">42%</div><canvas id="sparkSavings"></canvas></div>
-        <div class="card"><header>Tax Paid</header><div class="value">$5,200</div><canvas id="sparkTax"></canvas></div>
+    @if (ShowOnboarding)
+    {
+        <Onboarding Show="@ShowOnboarding" />
+    }
+    else
+    {
+        <!-- GRID LAYOUT -->
+        <section class="dashboard-grid">
+            <!-- KPIs -->
+            <div class="card"><header>Income</header><div class="value">$2,000</div><canvas id="sparkIncome"></canvas></div>
+            <div class="card"><header>Expenses</header><div class="value">$640</div><canvas id="sparkExpense"></canvas></div>
+            <div class="card"><header>Savings</header><div class="value">42%</div><canvas id="sparkSavings"></canvas></div>
+            <div class="card"><header>Tax Paid</header><div class="value">$5,200</div><canvas id="sparkTax"></canvas></div>
 
-        <!-- Mid charts -->
-        <div class="card span-2">
-            <header>Spending Categories</header>
-            <canvas id="pieCategories"></canvas>
-        </div>
+            <!-- Mid charts -->
+            <div class="card span-2">
+                <header>Spending Categories</header>
+                <canvas id="pieCategories"></canvas>
+            </div>
 
-        <div class="card">
-            <header>Upcoming Bills</header>
-            <ul class="bills">
-                <li><b>Rent</b><span>$1,200</span><em>3d</em></li>
-                <li><b>Gym</b><span>$25</span><em>4d</em></li>
-                <li><b>Netflix</b><span>$20</span><em>10d</em></li>
-                <li><b>Mobile</b><span>$35</span><em>13d</em></li>
-            </ul>
-        </div>
+            <div class="card">
+                <header>Upcoming Bills</header>
+                <ul class="bills">
+                    <li><b>Rent</b><span>$1,200</span><em>3d</em></li>
+                    <li><b>Gym</b><span>$25</span><em>4d</em></li>
+                    <li><b>Netflix</b><span>$20</span><em>10d</em></li>
+                    <li><b>Mobile</b><span>$35</span><em>13d</em></li>
+                </ul>
+            </div>
 
-        <div class="card">
-            <header>Recent Activity</header>
-            <ul class="history">
-                <li><span class="pill ok">Paid</span> Salary +$4,200</li>
-                <li><span class="pill neutral">Expense</span> Groceries -$180</li>
-                <li><span class="pill warn">Due</span> Internet $60</li>
-                <li><span class="pill ok">Saved</span> Holiday Fund +$100</li>
-            </ul>
-        </div>
+            <div class="card">
+                <header>Recent Activity</header>
+                <ul class="history">
+                    <li><span class="pill ok">Paid</span> Salary +$4,200</li>
+                    <li><span class="pill neutral">Expense</span> Groceries -$180</li>
+                    <li><span class="pill warn">Due</span> Internet $60</li>
+                    <li><span class="pill ok">Saved</span> Holiday Fund +$100</li>
+                </ul>
+            </div>
 
-        <!-- Bottom wide chart -->
-        <div class="card span-4">
-            <header>Cash Flow (Income vs Expenses)</header>
-            <canvas id="trendIncomeExpense"></canvas>
-        </div>
-    </section>
+            <!-- Bottom wide chart -->
+            <div class="card span-4">
+                <header>Cash Flow (Income vs Expenses)</header>
+                <canvas id="trendIncomeExpense"></canvas>
+            </div>
+        </section>
+    }
 </div>
 
 
 @code {
     private string FullName = "there";
     private string Greeting = "Hello";
+    private bool ShowOnboarding { get; set; } = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,6 +95,22 @@
 
                 if (user != null && !string.IsNullOrWhiteSpace(user.FullName))
                     FullName = user.FullName.Split(' ')[0];
+
+                if (user != null)
+                {
+                    Console.WriteLine($"[Dashboard] User.OnboardingStatus = {user.OnboardingStatus}");
+
+                    if (user.OnboardingStatus == 0)
+                    {
+                        Console.WriteLine("[Dashboard] Setting ShowOnboarding = true");
+                        ShowOnboarding = true;
+                    }
+                    else
+                    {
+                        Console.WriteLine("[Dashboard] Setting ShowOnboarding = false");
+                        ShowOnboarding = false;
+                    }
+                }
             }
             else
             {
@@ -124,6 +147,7 @@
         public string Id { get; set; } = "";
         public string FullName { get; set; } = "";
         public string Email { get; set; } = "";
+        public int OnboardingStatus { get; set; } = 0;
     }
 
  

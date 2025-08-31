@@ -1,0 +1,350 @@
+﻿@* @page "/onboarding" *@
+@using Zenvestify.Shared.Layout
+@using Zenvestify.Shared.Services
+@using static Zenvestify.Shared.Services.UserProfileService
+@using static Zenvestify.Shared.Models.UserProfileDtos;
+@inject UserProfileService ProfileService
+@inject IJSRuntime JS
+
+@layout MainLayout
+@inject NavigationManager Nav
+
+@if (Show)
+{
+    <div class="modal fade show d-block onboarding-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4 bg-surface text-light">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">@StepTitle</h5>
+                    <div class="progress flex-grow-1 ms-3" style="height:6px;">
+                        <div class="progress-bar bg-brand" role="progressbar" style="width:@Progress%"></div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    @if (Step == 1)
+                    {
+                        <div class="step">
+                            <p class="lead">What’s your <b>main income source</b>?</p>
+                            <select class="form-select mb-3" @bind="IncomeSource">
+                                <option value="">-- Select --</option>
+                                <option>Salary / Wages</option>
+                                <option>Business</option>
+                                <option>Pension</option>
+                                <option>Other</option>
+                            </select>
+
+                            <p>How often do you get paid?</p>
+                            <select class="form-select mb-3" @bind="PayFrequency">
+                                <option value="">-- Select --</option>
+                                <option>Weekly</option>
+                                <option>Fortnightly</option>
+                                <option>Monthly</option>
+                            </select>
+
+                            <p>How much do you usually receive <b>per payslip</b>?</p>
+                            <input class="form-control" type="number" placeholder="e.g. 2000 (gross or net, specify next)" @bind="PayAmount" />
+
+                            @if (!string.IsNullOrEmpty(ValidationMessage) && Step == 1)
+                            {
+                                <div class="alert alert-warning mt-3">@ValidationMessage</div>
+                            }
+                        </div>
+                    }
+                    else if (Step == 2)
+                    {
+                        <div class="step">
+                            <p class="lead">Is that amount <b>after tax</b> or <b>before tax</b>?</p>
+                            <div class="d-flex gap-3 mt-3">
+                                <button class="btn flex-fill @(IsNetPay == true ? "btn-brand" : "btn-outline-light")" @onclick="() => { IsNetPay = true; ShowTaxInput = false; }">After Tax (Net)</button>
+                                <button class="btn flex-fill @(IsNetPay == false ? "btn-brand" : "btn-outline-light")" @onclick="() => { IsNetPay = false; ShowTaxInput = true; }">Before Tax (Gross)</button>
+                            </div>
+
+                            @if (ShowTaxInput)
+                            {
+                                <div class="mt-3">
+                                    <p>Do you know how much <b>tax is withheld</b> each cycle?</p>
+                                    <input class="form-control" type="number" placeholder="Optional" @bind="TaxWithheld" />
+                                    <small class="text-muted mt-2">Don’t worry if you’re not sure — we’ll estimate it for you.</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (Step == 3)
+                    {
+                        <div class="step">
+                            <p class="lead">Do you have any <b>other taxable income</b> (side gig, bank interest, etc.)?</p>
+
+                            @foreach (var income in OtherIncomes)
+                            {
+                                <div class="border rounded p-3 mb-3">
+                                    <label class="form-label">Source</label>
+                                    <input class="form-control mb-2" placeholder="e.g. Uber, Bank Interest" @bind="income.Source" />
+                                    <label class="form-label">Amount</label>
+                                    <input class="form-control mb-2" type="number" @bind="income.Amount" />
+                                    <label class="form-label">Frequency</label>
+                                    <select class="form-select mb-2" @bind="income.Frequency">
+                                        <option>Weekly</option>
+                                        <option>Monthly</option>
+                                        <option>Irregular</option>
+                                    </select>
+                                    <p class="small text-muted mt-2">If this income is irregular, you can log it manually later.</p>
+                                    <button class="btn btn-sm btn-outline-danger mt-2" @onclick="() => RemoveOtherIncome(income)">Delete</button>
+                                </div>
+                            }
+
+                            <button class="btn btn-outline-light w-100 mt-2" @onclick="AddOtherIncome"
+                                    disabled="@OtherIncomes.Any(i => string.IsNullOrEmpty(i.Source) || i.Amount <= 0)">
+                                @(OtherIncomes.Count == 0 ? "+ Add a secondary income" : "+ Add another income")
+                            </button>
+
+                            @if (OtherIncomes.Count == 0)
+                            {
+                                <p class="text-center mt-1">To skip press <b>Next</b></p>
+                            }
+
+                            @if (!string.IsNullOrEmpty(ValidationMessage) && Step == 3 && OtherIncomes.Count > 0)
+                            {
+                                <div class="alert alert-warning mt-3">@ValidationMessage</div>
+                            }
+                        </div>
+                    }
+                    else if (Step == 4)
+                    {
+                        <div class="step">
+                            <p class="lead">Do you want to set a <b>savings goal</b>?</p>
+
+                            @foreach (var goal in SavingsGoals)
+                            {
+                                <div class="border rounded p-3 mb-3">
+                                    <label class="form-label">Goal Name</label>
+                                    <input class="form-control mb-2" placeholder="Name (e.g. House Deposit)" @bind="goal.Name" />
+                                    <label class="form-label">Target Amount</label>
+                                    <input class="form-control mb-2" placeholder="Target Amount" type="number" @bind="goal.TargetAmount" />
+                                    <label class="form-label">Target Date</label>
+                                    <input class="form-control" placeholder="Target Date" type="date" @bind="goal.TargetDate" />
+                                    <button class="btn btn-sm btn-outline-danger mt-2" @onclick="() => RemoveSavingsGoal(goal)">Delete</button>
+                                </div>
+                            }
+
+                            <button class="btn btn-outline-light w-100 mt-2" @onclick="AddSavingsGoal"
+                                    disabled="@SavingsGoals.Any(g => string.IsNullOrEmpty(g.Name) || g.TargetAmount <= 0 || g.TargetDate == null)">
+                                @(SavingsGoals.Count == 0 ? "+ Add a savings goal" : "+ Add another goal")
+                            </button>
+
+                            @if(SavingsGoals.Count == 0)
+                            {
+                                <p class="text-center mt-1">To skip press <b>Next</b></p>
+                            }
+
+                            @if (!string.IsNullOrEmpty(ValidationMessage) && Step == 4 && SavingsGoals.Count > 0)
+                            {
+                                <div class="alert alert-warning mt-3">@ValidationMessage</div>
+                            }
+                        </div>
+                    }
+                    else if (Step == 5)
+                    {
+                        <div class="step">
+                            <p class="lead">Do you have any <b>loans or a mortgage</b>?</p>
+
+                            @foreach (var loan in Loans)
+                            {
+                                <div class="border rounded p-3 mb-3">
+                                    <label class="form-label">Loan Name</label>
+                                    <input class="form-control mb-2" placeholder="Loan Name (e.g. Mortgage, Car Loan)" @bind="loan.Name" />
+                                    <label class="form-label">Principal Amount</label>
+                                    <input class="form-control mb-2" placeholder="Principal Amount" type="number" @bind="loan.Principal" />
+                                    <label class="form-label">Interest Rate (%)</label>
+                                    <input class="form-control mb-2" placeholder="Interest Rate (%)" type="number" @bind="loan.InterestRate" />
+                                    <label class="form-label">Repayment Amount</label>
+                                    <input class="form-control mb-2" placeholder="Repayment Amount" type="number" @bind="loan.RepaymentAmount" />
+                                    <label class="form-label">Repayment Frequency</label>
+                                    <select class="form-select mb-2" @bind="loan.RepaymentFrequency">
+                                        <option>Weekly</option>
+                                        <option>Fortnightly</option>
+                                        <option>Monthly</option>
+                                    </select>
+                                    <label class="form-label">Remaining Term (months)</label>
+                                    <input class="form-control mb-2" placeholder="Remaining Term (months)" type="number" @bind="loan.RemainingTermMonths" />
+                                    <label class="form-label">Amount Paid So Far (optional)</label>
+                                    <input class="form-control mb-2" placeholder="Amount Paid So Far (optional)" type="number" @bind="loan.AmountPaidSoFar" />
+                                    <label class="form-label">Start Date</label>
+                                    <input class="form-control mb-2" placeholder="Start Date" type="date" @bind="loan.StartDate" />
+
+                                    <button class="btn btn-sm btn-outline-danger mt-2" @onclick="() => RemoveLoan(loan)">Delete</button>
+                                </div>
+                            }
+
+                            <button class="btn btn-outline-light w-100 mt-2" @onclick="AddLoan"
+                                    disabled="@Loans.Any(l => string.IsNullOrEmpty(l.Name) || l.Principal <= 0 || l.RepaymentAmount <= 0)">
+                                @(Loans.Count == 0 ? "+ Add a loan or morgage" : "+ Add another loan or morgage")
+                            </button>
+
+                            @if(Loans.Count == 0)
+                            {
+                                <p class="text-center mt-1">To skip press <b>Next</b></p>
+                            }
+
+                            @if (!string.IsNullOrEmpty(ValidationMessage) && Step == 6 && Loans.Count > 0)
+                            {
+                                <div class="alert alert-warning mt-3">@ValidationMessage</div>
+                            }
+                        </div>
+                    }
+                    else if (Step == 6)
+                    {
+                        <div class="step text-center">
+                            <h4 class="mb-3">🎉 You’re all set!</h4>
+                            <p class="text-muted">Your profile is saved. Your dashboard will now show real data.</p>
+                            <button class="btn btn-primary w-100 mt-3" @onclick="Finish">Go to Dashboard</button>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer border-0">
+                    @if (Step > 1 && Step < 6)
+                    {
+                        <button class="btn btn-outline-light" @onclick="Prev">Back</button>
+                    }
+
+                    @if (Step < 6)
+                    {
+                        <button class="btn btn-brand" @onclick="Next">Next</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    private string? ValidationMessage { get; set; }
+    private int Step = 1;
+
+    private string StepTitle => Step switch
+    {
+        1 => "Income",
+        2 => "Tax Handling",
+        3 => "Other Income",
+        4 => "Savings Goal",
+        5 => "Loan Details",
+        6 => "Finish",
+        _ => ""
+    };
+
+    private int Progress => (int)(Step * (100.0 / 6));
+
+    // Income
+    private string? IncomeSource { get; set; }
+    private string? PayFrequency { get; set; }
+    private decimal PayAmount { get; set; }
+    private bool? IsNetPay { get; set; } = null;
+    private bool ShowTaxInput { get; set; } = false;
+    private decimal? TaxWithheld { get; set; }
+
+    // Other Incomes
+    private bool HasOtherIncome { get; set; }
+    private List<OtherIncomeDto> OtherIncomes { get; set; } = new();
+    private void AddOtherIncome() => OtherIncomes.Add(new OtherIncomeDto { Source = "", Amount = 0, Frequency = "Irregular" });
+    private void RemoveOtherIncome(OtherIncomeDto income) 
+    {
+        OtherIncomes.Remove(income);
+        if (OtherIncomes.Count == 0)
+            ValidationMessage = null;
+    }
+
+    // Loans (multiple)
+    private bool HasLoan { get; set; }
+    private List<LoanDto> Loans { get; set; } = new();
+    private void AddLoan() => Loans.Add(new LoanDto
+    {
+        Name = "",
+        Principal = 0,
+        InterestRate = 0,
+        RepaymentAmount = 0,
+        RepaymentFrequency = "Monthly",
+        RemainingTermMonths = null,
+        AmountPaidSoFar = null,
+        StartDate = DateTime.Today
+    });
+    private void RemoveLoan(LoanDto loan)
+    { 
+        Loans.Remove(loan); 
+        if(Loans.Count == 0)
+            ValidationMessage = null;
+    }
+
+
+    // Savings Goals
+    private List<SavingsGoalDto> SavingsGoals { get; set; } = new();
+    private void AddSavingsGoal() => SavingsGoals.Add(new SavingsGoalDto { Name = "", TargetAmount = 0, TargetDate = null });
+    private void RemoveSavingsGoal(SavingsGoalDto goal)
+    {
+        SavingsGoals.Remove(goal);
+        if (SavingsGoals.Count == 0)
+            ValidationMessage = null;
+    }
+
+    private void Next()
+    {
+        if (Step == 1 && (string.IsNullOrEmpty(IncomeSource) || string.IsNullOrEmpty(PayFrequency) || PayAmount <= 0))
+        {
+            ValidationMessage = "Please enter your income source, frequency and amount";
+            return;
+        }
+
+        if (Step == 3 && OtherIncomes.Any(i => string.IsNullOrEmpty(i.Source) || i.Amount <= 0))
+        {
+            ValidationMessage = "Please complete or delete all other income entries";
+            return;
+        }
+
+        if (Step == 4 && SavingsGoals.Any(g => string.IsNullOrEmpty(g.Name) || g.TargetAmount <= 0 || g.TargetDate == null))
+        {
+            ValidationMessage = "Please complete or delete all savings goals";
+            return;
+        }
+
+        if (Step == 5 && Loans.Any(l => string.IsNullOrEmpty(l.Name) || l.Principal <= 0 || l.RepaymentAmount <= 0))
+        {
+            ValidationMessage = "Please complete all required loan details";
+            return;
+        }
+
+        ValidationMessage = null;
+        Step++;
+    }
+
+    private void Prev() => Step--;
+
+    private async Task Finish()
+    {
+        // Save income
+        await ProfileService.SetIncomeAsync(new IncomeDto
+        {
+            PayFrequency = PayFrequency,
+            NetPayPerCycle = IsNetPay == true ? PayAmount : null,
+            GrossPayPerCycle = IsNetPay == false ? PayAmount : null,
+            TaxWithheld = IsNetPay == false ? TaxWithheld : null
+        });
+
+        // Save other incomes
+        foreach (var income in OtherIncomes.Where(i => !string.IsNullOrEmpty(i.Source)))
+            await ProfileService.AddOtherIncomeAsync(income);
+
+        // Save loans
+        foreach (var loan in Loans.Where(l => !string.IsNullOrEmpty(l.Name)))
+            await ProfileService.AddLoanAsync(loan);
+
+        // Save savings goals
+        foreach (var goal in SavingsGoals.Where(g => !string.IsNullOrEmpty(g.Name)))
+            await ProfileService.AddSavingsGoalAsync(goal);
+
+        // Complete onboarding
+        await ProfileService.CompleteOnboardingAsync(new CompleteOnboardingDto());
+
+        Nav.NavigateTo("/dashboard");
+    }
+}
+
