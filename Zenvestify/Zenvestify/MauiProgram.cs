@@ -17,6 +17,10 @@ namespace Zenvestify
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                })
+                .ConfigureEssentials(essentials =>
+                {
+                    essentials.UseVersionTracking();
                 });
 
             // Add device-specific services used by the Zenvestify.Shared project
