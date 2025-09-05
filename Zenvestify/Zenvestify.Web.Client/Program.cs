@@ -4,15 +4,22 @@ using Zenvestify.Web.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Add device-specific services used by the Zenvestify.Shared project
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
 
-// Register HttpClient for Blazor WASM
 builder.Services.AddScoped(sp => new HttpClient
 {
 	BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
 });
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<UserProfileService>();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+var auth = host.Services.GetRequiredService<AuthService>();
+await auth.LoadTokenAsync();
+
+Console.WriteLine("[CLIENT.Program.cs] Token after LoadTokenAsync = " + (auth.Token ?? "NULL"));
+
+await host.RunAsync();
+//await builder.Build().RunAsync();

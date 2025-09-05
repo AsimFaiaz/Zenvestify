@@ -7,12 +7,14 @@
 	--color-surface: #151a2b;
 	--color-text: #e8eaf1;
 	--color-text-dark: #212121;
+	--color-text-light: #fff;
 	--color-text-muted: rgba(232,234,241,.8);
 	--shadow-brand: 0 10px 24px rgba(106,141,255,.35);
 }
 
 body {
 	font-family: 'Inter', sans-serif;
+	outline: 2px solid lime;
 }
 
 h1, h2, h3, .hero-heading {
@@ -29,7 +31,7 @@ h1, h2, h3, .hero-heading {
 .btn-primary {
 	background: var(--color-primary);
 	border: none;
-	color: #fff;
+	color: var(--color-text-light);
 	box-shadow: var(--shadow-brand);
 }
 
@@ -40,7 +42,7 @@ h1, h2, h3, .hero-heading {
 
 .btn-secondary {
 	background: var(--color-secondary);
-	color: #fff;
+	color: var(--color-text-light);
 	border: none;
 }
 
@@ -50,34 +52,33 @@ h1, h2, h3, .hero-heading {
 
 
 .btn-outline {
-	border: 2px solid var(--color-primary);
 	color: var(--color-primary);
 	background: transparent;
 }
 
-.btn-outline:hover {
-	background: var(--color-primary);
-	color: #fff;
-}
+	.btn-outline:hover {
+		background: var(--color-primary);
+		color: var(--color-text-light);
+	}
 
 .btn-brand {
 	background: var(--color-primary);
-	border: none;
-	color: #fff;
+	color: var(--color-text-light);
 	box-shadow: var(--shadow-brand);
 }
 
-.btn-brand:hover {
-	background: var(--color-primary-hover);
-	transform: translateY(-2px);
-}
+	.btn-brand:hover {
+		transform: translateY(-2px);
+		color: var(--color-text-light);
+	}
 
 .btn-outline-light {
-	border: 2px solid var(--color-text);
 	color: var(--color-text);
 	background: transparent;
 }
 
-.btn-outline-light:hover {
-	background: rgba(232,234,241,.1);
-}
+	.btn-outline-light:hover {
+		background: rgba(232,234,241,.1);
+		transform: translateY(-2px);
+		color: var(--color-text-light);
+	}

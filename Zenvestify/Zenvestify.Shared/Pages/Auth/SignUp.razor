@@ -90,7 +90,8 @@
 
     public class SignupVm
     {
-        [Required, MinLength(2)]
+        //TODO: CHANGE MIN LENGTH TO 2
+        [Required, MinLength(1)]
         [Display(Name = "Full Name")]
         public string FullName { get; set; } = "";
 
@@ -98,10 +99,11 @@
         [Display(Name = "Email Address")]
         public string Email { get; set; } = "";
 
-        [Required, MinLength(8)]
+        //TODO: CHANGE MIN LENGTH TO 8
+        [Required, MinLength(1)]
         public string Password { get; set; } = "";
 
-        [Required, MinLength(8), Compare(nameof(Password), ErrorMessage = "Passwords did not match")]
+        [Required, MinLength(1), Compare(nameof(Password), ErrorMessage = "Passwords did not match")]
         [Display(Name = "Confirm Password")]
         public string ConfirmPassword { get; set; } = "";
     }
