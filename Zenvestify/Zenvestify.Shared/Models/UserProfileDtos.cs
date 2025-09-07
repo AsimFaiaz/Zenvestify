@@ -8,20 +8,41 @@
 			public decimal? NetPayPerCycle { get; set; }
 			public decimal? GrossPayPerCycle { get; set; }
 			public decimal? TaxWithheld { get; set; }
+			public DateTime? CreatedAt { get; set; }
+			public DateTime? UpdatedAt { get; set; }
+			public byte OnboardingStage { get; set; }
+			public int? UsualPayDay { get; set; }
+
 		}
 
 		public class OtherIncomeDto
 		{
+			public Guid Id { get; set; }       // for editing/deleting
 			public string Source { get; set; } = "";
 			public decimal Amount { get; set; }
 			public string Frequency { get; set; } = "";
+			public DateTime? CreatedAt { get; set; }
+			public DateTime? UpdatedAt { get; set; }
 		}
+
+		public class IncomeTransactionDto
+		{
+			public Guid Id { get; set; }
+			public Guid SourceId { get; set; }   // FK to OtherIncome
+			public DateTime TxnDate { get; set; }
+			public decimal GrossAmount { get; set; }
+			public decimal? NetAmount { get; set; }
+			public string? Notes { get; set; }
+		}
+
 
 		public class SavingsGoalDto
 		{
 			public string Name { get; set; } = "";
 			public decimal TargetAmount { get; set; }
 			public DateTime? TargetDate { get; set; }
+			public decimal? AmountSavedToDate { get; set; } 
+			public int Status { get; set; } 
 		}
 
 		public class BillDto

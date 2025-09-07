@@ -1,0 +1,176 @@
+﻿/* Page container */
+/*.container-fluid {
+    padding: 2rem;
+}*/
+
+/* KPI Cards */
+/*.card {
+    background: var(--color-surface);
+    border: none;
+    border-radius: 1rem;
+    color: var(--color-text);
+    transition: all .2s ease-in-out;
+}
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-brand);
+    }
+
+    .card h3 {
+        font-weight: 700;
+        color: var(--color-text-light);
+        margin: 0.2rem 0;
+    }
+
+    .card p {
+        color: var(--color-text-muted);
+        margin: 0;
+    }*/
+
+/* Table */
+/*.table {
+    color: var(--color-text);
+    background: var(--color-surface);
+    border-radius: .75rem;
+    overflow: hidden;
+}
+
+    .table thead {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+        .table thead th {
+            border: none;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            padding: .75rem;
+        }
+
+    .table tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .table tbody td {
+        vertical-align: middle;
+        padding: .75rem;
+    }*/
+
+    /* Small action buttons */
+    /*.table .btn {
+        padding: .25rem .6rem;
+        font-size: .8rem;
+        border-radius: .4rem;
+    }*/
+
+/* Chart cards */
+/*canvas {
+    width: 100% !important;
+    height: 300px !important;
+}*/
+
+/* Tax summary */
+/*.card h6 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.income-breakdown .row {
+    margin-bottom: 0.25rem;
+    font-size: 0.95rem;
+}*/
+
+
+/* Responsive tweaks */
+/*@media (max-width: 768px) {
+    .container-fluid {
+        padding: 1rem;
+    }
+
+    .card h3 {
+        font-size: 1.2rem;
+    }
+
+    .table {
+        font-size: 0.9rem;
+    }
+}*/
+
+
+.section-title {
+    font-size: 1.1rem
+}
+
+.metric {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: .25rem .75rem
+}
+
+    .metric dd {
+        margin: 0;
+        font-weight: 700
+    }
+
+.tiny {
+    font-size: .85rem
+}
+
+.divider {
+    border-top: 1px dashed #2a3145;
+    margin: .75rem 0
+}
+
+.form-check-input:checked {
+    background: var(--brand);
+    border-color: var(--brand)
+}
+
+.kpi {
+    display: flex;
+    gap: 12px;
+    align-items: center
+}
+
+.kpi .pill {
+    padding: .3rem .6rem;
+    border-radius: 999px;
+    border: 1px solid #2a3145
+}
+
+.display-amount {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: .3px
+}
+
+.period-toggle .btn.active {
+    color: var(--color-text-dark);
+}
+
+
+/* Force-white text everywhere */
+body, .card, .section-title, .metric dt, .metric dd,
+.form-label, .form-check-label, .input-group-text,
+.form-control, .form-select, footer, .text-muted, .tiny {
+    color: var(--color-text-light) !important;
+}
+
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: #fff
+}
+
+    .table thead th {
+        border-bottom-color: #2a3145
+    }
+
+    .table tbody tr + tr {
+        border-top: 1px solid #232838
+    }
+
+.offcanvas {
+    background: var(--card);
+    color: #fff
+}

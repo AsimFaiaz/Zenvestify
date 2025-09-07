@@ -35,8 +35,9 @@ namespace Zenvestify.Shared.Services
 			var baseUrl = _config["ApiBaseUrl"]
 				?? throw new InvalidOperationException("ApiBaseUrl missing in appsettings.json");
 			_http.BaseAddress = new Uri(baseUrl);
-			
 		}
+
+		public HttpClient Http => _http;
 
 		public async Task<(bool ok, string? error)> RegisterAsync(string fullName, string email, string password)
 		{

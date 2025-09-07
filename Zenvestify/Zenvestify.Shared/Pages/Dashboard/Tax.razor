@@ -1,0 +1,174 @@
+﻿@page "/tax"
+@using System.IdentityModel.Tokens.Jwt
+@using System.Security.Claims
+@using Microsoft.IdentityModel.JsonWebTokens
+@using System.Net.Http.Json
+@using Microsoft.JSInterop
+@using Zenvestify.Shared.Layout
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using static Zenvestify.Shared.Models.UserProfileDtos
+@layout MainLayout
+@inject NavigationManager Nav
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject Zenvestify.Shared.Services.AuthService Auth
+@inject Zenvestify.Shared.Services.UserProfileService ProfileService
+
+
+<div class="tax-dashboard">
+    <h2>Welcome to your tax dashboard</h2>
+    <p class="text-muted">
+        Here we break down your income, estimated tax withheld, and take-home pay based on Australian tax brackets.
+    </p>
+
+    <div class="card mb-4">
+        <header>Your Main Income</header>
+
+        @if (Income is not null)
+        {
+            <p>@(Income.NetPayPerCycle is not null ? "After Tax (Net)" : "Before Tax (Gross)")</p>
+            <p><b>@DisplayAmount</b> (@Income.PayFrequency)</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <p class="text-danger">@ErrorMessage</p>
+        }
+        else
+        {
+            <p>No income data yet. Please complete onboarding.</p>
+        }
+    </div>
+
+    <!-- Render canvases ALWAYS so they’re present when JS runs -->
+    <div class="btn-group mb-4" hidden="@(Income is null)">
+        <button class="btn btn-outline-light @(SelectedView == "Yearly" ? "btn-brand" : "")"
+                @onclick="@(() => ChangeView("Yearly"))">
+            Yearly
+        </button>
+        <button class="btn btn-outline-light @(SelectedView == "Monthly" ? "btn-brand" : "")"
+                @onclick="@(() => ChangeView("Monthly"))">
+            Monthly
+        </button>
+        <button class="btn btn-outline-light @(SelectedView == "Fortnightly" ? "btn-brand" : "")"
+                @onclick="@(() => ChangeView("Fortnightly"))">
+            Fortnightly
+        </button>
+        <button class="btn btn-outline-light @(SelectedView == "Weekly" ? "btn-brand" : "")"
+                @onclick="@(() => ChangeView("Weekly"))">
+            Weekly
+        </button>
+    </div>
+
+    <section class="charts-grid" hidden="@(Income is null)">
+        <div class="card">
+            <header>Tax Breakdown</header>
+            <div class="chart-h-240">
+            <canvas id="taxPie" @ref="pieRef"></canvas>
+            </div>
+           
+        </div>
+        <div class="card span-2">
+            <header>Tax Brackets</header>
+                <div class="chart-h-240">
+            <canvas id="taxBands" @ref="barsRef"></canvas>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code
+{
+    private IncomeDto? Income;
+    private string? ErrorMessage;
+    private string SelectedView { get; set; } = "Yearly";
+    private string DisplayAmount { get; set; } = "";
+
+    private decimal YearlyGross { get; set; }
+
+    // Canvas element refs (reliable, no querySelector race)
+    private ElementReference pieRef;
+    private ElementReference barsRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Auth.WhenReady;
+
+            Income = await ProfileService.GetIncomeAsync();
+            if (Income is not null)
+            {
+                YearlyGross = NormalizeToYearly();
+                DisplayAmount = YearlyGross.ToString("C0") + " (Yearly)";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Tax] Error: {ex.Message}");
+            ErrorMessage = "Could not load income data.";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Only draw when we have data and the canvases exist (after first render)
+        if (Income is not null && YearlyGross > 0)
+        {
+            // tiny yield to ensure refs are populated
+            await Task.Yield();
+            await UpdateCharts(YearlyGross);
+        }
+    }
+
+    private decimal NormalizeToYearly()
+    {
+        var amount = Income?.NetPayPerCycle ?? Income?.GrossPayPerCycle ?? 0;
+        return (Income?.PayFrequency?.ToLower()) switch
+        {
+            "weekly" => amount * 52,
+            "fortnightly" => amount * 26,
+            "monthly" => amount * 12,
+            _ => amount
+        };
+    }
+
+    private async Task ChangeView(string view)
+    {
+        SelectedView = view;
+
+        decimal divisor = view switch
+        {
+            "Monthly" => 12,
+            "Fortnightly" => 26,
+            "Weekly" => 52,
+            _ => 1
+        };
+
+        var per = YearlyGross / divisor;
+        DisplayAmount = per.ToString("C0") + $" ({view})";
+
+        await UpdateCharts(YearlyGross); // charts display yearly split
+        StateHasChanged();
+    }
+
+    private async Task UpdateCharts(decimal yearlyGross)
+    {
+        // simple placeholder: 23% tax
+        decimal tax = yearlyGross * 0.23m;
+        decimal net = yearlyGross - tax;
+
+        Console.WriteLine($"[Tax] Calling JS with gross={yearlyGross}, tax={tax}, net={net}");
+
+        // IMPORTANT: cast to double for JSInterop
+        await JS.InvokeVoidAsync(
+            "ZvTaxCharts.updateByRef",
+            pieRef, barsRef,
+            (double)yearlyGross,
+            (double)tax,
+            (double)net
+        );
+    }
+}
+
+<script src="_content/Zenvestify.Shared/js/tax.js"></script>

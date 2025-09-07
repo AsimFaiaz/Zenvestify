@@ -93,8 +93,8 @@ namespace Zenvestify.Web.Data
 		//More than 1 income sources
 		public async Task AddOtherIncomeAsync(Guid userId, string source, decimal amount, string frequency)
 		{
-			const string sql = @"INSERT INTO OtherIncome (UserId, Source, Amount, Frequency) 
-                         VALUES (@UserId, @Source, @Amount, @Frequency)";
+			const string sql = @"INSERT INTO OtherIncome (Id, UserId, Source, Amount, Frequency, CreatedAt)
+                     VALUES (NEWID(), @UserId, @Source, @Amount, @Frequency, SYSUTCDATETIME())";
 			using var conn = new SqlConnection(_connectionString);
 			await conn.ExecuteAsync(sql, new { UserId = userId, Source = source, Amount = amount, Frequency = frequency });
 		}
@@ -105,6 +105,29 @@ namespace Zenvestify.Web.Data
 			using var conn = new SqlConnection(_connectionString);
 			return await conn.QueryAsync(sql, new { UserId = userId });
 		}
+
+		public async Task UpdateOtherIncomeAsync(Guid id, string source, decimal amount, string frequency)
+		{
+			const string sql = @"
+        UPDATE OtherIncome
+        SET Source     = @Source,
+            Amount     = @Amount,
+            Frequency  = @Frequency,
+            UpdatedAt  = SYSUTCDATETIME()
+        WHERE Id = @Id";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { Id = id, Source = source, Amount = amount, Frequency = frequency });
+		}
+
+		public async Task DeleteOtherIncomeAsync(Guid id, Guid userId)
+		{
+			const string sql = @"DELETE FROM OtherIncome WHERE Id = @Id AND UserId = @UserId";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { Id = id, UserId = userId });
+		}
+
 
 		//Daily expenses tracking
 		public async Task AddExpenseAsync(Guid userId, string category, decimal amount, DateTime dateSpent, string? notes, bool taxDeductible, bool workRelated)
@@ -126,24 +149,28 @@ namespace Zenvestify.Web.Data
 		}
 
 		//Primary income
-		public async Task SetIncomeAsync(Guid userId, string payFrequency, decimal? netPayPerCycle, decimal? grossPayPerCycle, decimal? taxWithheld)
+		public async Task SetIncomeAsync(Guid userId, string payFrequency, decimal? netPayPerCycle, decimal? grossPayPerCycle, decimal? taxWithheld, int? usualPayDay)
 		{
 			const string sql = @"
-                MERGE IncomeSettings AS target
-                USING (SELECT @UserId AS UserId) AS source
-                ON target.UserId = source.UserId
-                WHEN MATCHED THEN
-                    UPDATE SET PayFrequency = @PayFrequency,
-                               NetPayPerCycle = @NetPayPerCycle,
-                               GrossPayPerCycle = @GrossPayPerCycle,
-							   TaxWithheld = @TaxWithheld
-                WHEN NOT MATCHED THEN
-                    INSERT (UserId, PayFrequency, NetPayPerCycle, GrossPayPerCycle, TaxWithheld)
-                    VALUES (@UserId, @PayFrequency, @NetPayPerCycle, @GrossPayPerCycle, @TaxWithheld);";
+        MERGE IncomeSettings AS target
+        USING (SELECT @UserId AS UserId) AS source
+        ON target.UserId = source.UserId
+        WHEN MATCHED THEN
+            UPDATE SET PayFrequency = @PayFrequency,
+                       NetPayPerCycle = @NetPayPerCycle,
+                       GrossPayPerCycle = @GrossPayPerCycle,
+                       TaxWithheld = @TaxWithheld,
+                       UsualPayDay = @UsualPayDay,
+                       OnboardingStage = CASE WHEN OnboardingStage = 0 THEN 1 ELSE OnboardingStage END,
+                       UpdatedAt = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN
+            INSERT (UserId, PayFrequency, NetPayPerCycle, GrossPayPerCycle, TaxWithheld, UsualPayDay, OnboardingStage, CreatedAt)
+            VALUES (@UserId, @PayFrequency, @NetPayPerCycle, @GrossPayPerCycle, @TaxWithheld, @UsualPayDay, 1, SYSUTCDATETIME());";
 
 			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { userId, payFrequency, netPayPerCycle, grossPayPerCycle, taxWithheld });
+			await conn.ExecuteAsync(sql, new { userId, payFrequency, netPayPerCycle, grossPayPerCycle, taxWithheld, usualPayDay });
 		}
+
 
 		public async Task<IncomeSettings?> GetIncomeAsync(Guid userId)
 		{
@@ -153,12 +180,12 @@ namespace Zenvestify.Web.Data
 		}
 
 		//Savings
-		public async Task AddSavingsGoalAsync(Guid userId, string name, decimal targetAmount, DateTime? targetDate)
+		public async Task AddSavingsGoalAsync(Guid userId, string name, decimal targetAmount, DateTime? targetDate, decimal amountSaved, int status)
 		{
-			const string sql = @"INSERT INTO SavingsGoals (UserId, Name, TargetAmount, TargetDate)
-                                 VALUES (@userId, @name, @targetAmount, @targetDate)";
+			const string sql = @"INSERT INTO SavingsGoals (UserId, Name, TargetAmount, TargetDate, AmountSavedToDate, Status)
+                                 VALUES (@userId, @name, @targetAmount, @targetDate, @amountSaved, @status)";
 			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { userId, name, targetAmount, targetDate });
+			await conn.ExecuteAsync(sql, new { userId, name, targetAmount, targetDate, amountSaved, status });
 		}
 
 		public async Task<IEnumerable<SavingsGoal>> GetSavingsGoalsAsync(Guid userId)
@@ -242,6 +269,62 @@ namespace Zenvestify.Web.Data
 			using var conn = new SqlConnection(_connectionString);
 			return await conn.QueryFirstOrDefaultAsync<TaxSettings>(sql, new { userId });
 		}
+
+		//Income transactions
+
+		public async Task AddIncomeTransactionAsync(Guid userId, Guid sourceId, DateTime txnDate, decimal gross, decimal? net, string? notes)
+		{
+			const string sql = @"
+        INSERT INTO IncomeTransactions (Id, UserId, SourceId, TxnDate, GrossAmount, NetAmount, Notes, CreatedAt)
+        VALUES (NEWID(), @UserId, @SourceId, @TxnDate, @GrossAmount, @NetAmount, @Notes, SYSUTCDATETIME());
+
+        UPDATE IncomeSettings
+        SET OnboardingStage = 2, UpdatedAt = SYSUTCDATETIME()
+        WHERE UserId = @UserId AND OnboardingStage < 2;
+    ";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { UserId = userId, SourceId = sourceId, TxnDate = txnDate, GrossAmount = gross, NetAmount = net ?? gross, Notes = notes });
+		}
+
+
+
+		public async Task<IEnumerable<IncomeTransactionDto>> GetIncomeTransactionsAsync(Guid userId, Guid sourceId)
+		{
+			const string sql = @"
+        SELECT Id, SourceId, TxnDate, GrossAmount, NetAmount, Notes, CreatedAt
+        FROM IncomeTransactions
+        WHERE SourceId = @SourceId AND UserId = @UserId
+        ORDER BY TxnDate DESC";
+
+			using var conn = new SqlConnection(_connectionString);
+			return await conn.QueryAsync<IncomeTransactionDto>(sql, new { SourceId = sourceId, UserId = userId });
+		}
+
+
+		public async Task DeleteIncomeTransactionAsync(Guid userId, Guid txnId)
+		{
+			const string sql = @"DELETE FROM IncomeTransactions WHERE Id = @Id AND UserId = @UserId";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { Id = txnId, UserId = userId });
+		}
+
+		public async Task UpdateIncomeTransactionAsync(Guid userId, Guid txnId, DateTime txnDate, decimal gross, decimal? net, string? notes)
+		{
+			const string sql = @"
+        UPDATE IncomeTransactions
+        SET TxnDate     = @TxnDate,
+            GrossAmount = @GrossAmount,
+            NetAmount   = @NetAmount,
+            Notes       = @Notes,
+            UpdatedAt   = SYSUTCDATETIME()
+        WHERE Id = @Id AND UserId = @UserId";
+
+			using var conn = new SqlConnection(_connectionString);
+			await conn.ExecuteAsync(sql, new { Id = txnId, UserId = userId, TxnDate = txnDate, GrossAmount = gross, NetAmount = net ?? gross, Notes = notes });
+		}
+
 
 		//me
 		public async Task<User?> GetUserByIdAsync(Guid id)

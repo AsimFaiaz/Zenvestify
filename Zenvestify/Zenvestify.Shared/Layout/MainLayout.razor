@@ -19,7 +19,15 @@
                 <i class="bi bi-house"></i>
                 <span class="label">Dashboard</span>
             </a>
-            <a class="sidebar-link @(Nav.Uri.Contains("/expenses") ? "active" : "")" href="/expenses" title="Expenses">
+              <a class="sidebar-link @(Nav.Uri.Contains("/income") ? "active" : "")" href="/income" title="Income">
+                <i class="bi bi-money"></i>
+                <span class="label">Income</span>
+              </a>
+            <a class="sidebar-link @(Nav.Uri.Contains("/tax") ? "active" : "")" href="/tax" title="Tax Centre">
+                <i class="bi bi-percent"></i>
+                <span class="label">Tax Centre</span>
+            </a>
+            <a class="sidebar-link @(Nav.Uri.Contains("/expenses") ? "active" : "")" href="/expenses" title="Expenses" >
                 <i class="bi bi-cash-stack"></i>
                 <span class="label">Expenses</span>
             </a>
@@ -34,10 +42,6 @@
             <a class="sidebar-link @(Nav.Uri.Contains("/loans") ? "active" : "")" href="/loans" title="Loans">
                 <i class="bi bi-bank"></i>
                 <span class="label">Loans</span>
-            </a>
-            <a class="sidebar-link @(Nav.Uri.Contains("/tax") ? "active" : "")" href="/tax" title="Tax Centre">
-                <i class="bi bi-percent"></i>
-                <span class="label">Tax Centre</span>
             </a>
             <a class="sidebar-link @(Nav.Uri.Contains("/reports") ? "active" : "")" href="/reports" title="Reports">
                 <i class="bi bi-bar-chart"></i>
@@ -64,7 +68,6 @@
 
     @* chart.js *@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  
 
 </div>
 
