@@ -1,338 +1,378 @@
-﻿using Dapper;
-using Microsoft.Data.SqlClient;
+﻿using System.Security.Cryptography;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Zenvestify.Web.Models;
 using static Zenvestify.Shared.Models.UserProfileDtos;
 
 namespace Zenvestify.Web.Data
 {
-	public class UserRepository
-	{
-		private readonly string _connectionString;
-		public UserRepository(IConfiguration config)
-		{
-			_connectionString = config.GetConnectionString("DefaultConnection");
-		}
+    public class UserRepository
+    {
+        private readonly AppDbContext _db;
 
-		// get user by email
-		public async Task<User?> GetUserByEmailAsync(string email)
-		{
-			using var conn = new SqlConnection(_connectionString);
-			await conn.OpenAsync();
-			var sql = "SELECT * FROM Users WHERE Email = @Email";
-			return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Email = email });
-		}
+        public UserRepository(AppDbContext db)
+        {
+            _db = db;
+        }
 
-		//insert new user
-		public async Task<int> CreateAsync(User user)
-		{
-			using var conn = new SqlConnection(_connectionString);
-			await conn.OpenAsync();
-			var sql = @"INSERT INTO Users (FullName, Email, PasswordHash, CreatedAt, IsActive)
-                        VALUES (@FullName, @Email, @PasswordHash, GETDATE(), 1)";
-			return await conn.ExecuteAsync(sql, user);
-		}
+        // ---------- helpers ----------
+        private static string HashToken(string token)
+        {
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(token));
+            var sb = new StringBuilder(bytes.Length * 2);
+            foreach(var b in bytes) sb.Append(b.ToString("x2"));
+            return sb.ToString();
+        }
 
-		//Forget and reset password
-		public async Task<int> InsertPasswordResetTokenAsync(Guid userId, string token, DateTime expiresAt)
-		{
-			const string sql = @"INSERT INTO PasswordResetTokens (UserId, TOKEN, ExpiresAt, Used)
-                         VALUES (@UserId, @Token, @ExpiresAt, 0)";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.ExecuteAsync(sql, new { UserId = userId, Token = token, ExpiresAt = expiresAt });
-		}
+        // ---------- Users ----------
+        public Task<User?> GetUserByEmailAsync(string email)
+            => _db.Users.FirstOrDefaultAsync(u => u.Email == email);
 
-		public async Task<(Guid UserId, bool Valid)> ValidatePasswordResetTokenAsync(string token)
-		{
-			const string sql = @"SELECT TOP 1 UserId
-                         FROM PasswordResetTokens
-                         WHERE TOKEN = @Token AND Used = 0 AND ExpiresAt > SYSUTCDATETIME()";
-			using var conn = new SqlConnection(_connectionString);
-			var userId = await conn.QueryFirstOrDefaultAsync<Guid?>(sql, new { Token = token });
-			return (userId ?? Guid.Empty, userId.HasValue);
-		}
+        public async Task<int> CreateAsync(User user)
+        {
+            if(user.Id == Guid.Empty) user.Id = Guid.NewGuid();
+            user.CreatedAt = DateTime.UtcNow;
+            user.isActive = true;
+            _db.Users.Add(user);
+            return await _db.SaveChangesAsync();
+        }
 
-		public async Task<int> MarkPasswordResetTokenUsedAsync(string token)
-		{
-			const string sql = @"UPDATE PasswordResetTokens SET Used = 1 WHERE TOKEN = @Token";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.ExecuteAsync(sql, new { Token = token });
-		}
+        public async Task<int> UpdatePasswordHashAsync(Guid userId, string newHash)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if(user == null) return 0;
+            user.PasswordHash = newHash;
+            user.UpdatedAt = DateTime.UtcNow;
+            return await _db.SaveChangesAsync();
+        }
 
-		public async Task<int> UpdatePasswordHashAsync(Guid userId, string newHash)
-		{
-			const string sql = @"UPDATE Users SET PasswordHash = @Hash, UpdateAt = SYSUTCDATETIME() WHERE Id = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.ExecuteAsync(sql, new { Hash = newHash, UserId = userId });
-		}
+        public Task<User?> GetUserByIdAsync(Guid id)
+            => _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.isActive);
 
-		//Create user profile - After login for first time
-		public async Task<int> CreateUserProfileAsync(Guid userId)
-		{
-			const string sql = @"INSERT INTO UserProfile (UserId, Currency, Timezone, OnboardingStatus)
-                         VALUES (@UserId, 'AUD', NULL, 0)";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.ExecuteAsync(sql, new { UserId = userId });
-		}
+        // ---------- Password Reset (hashed) ----------
+        public async Task<int> InsertPasswordResetTokenAsync(Guid userId, string token, DateTime expiresAt)
+        {
+            _db.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                UserId = userId,
+                TokenHash = HashToken(token),
+                ExpiresAt = expiresAt,
+                Used = false
+            });
+            return await _db.SaveChangesAsync();
+        }
 
-		//Get user profile
-		public async Task<UserProfile?> GetUserProfileAsync(Guid userId)
-		{
-			const string sql = "SELECT * FROM UserProfile WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryFirstOrDefaultAsync<UserProfile>(sql, new { UserId = userId });
-		}
+        public async Task<(Guid UserId, bool Valid)> ValidatePasswordResetTokenAsync(string token)
+        {
+            var th = HashToken(token);
+            var row = await _db.PasswordResetTokens
+                .Where(t => t.TokenHash == th && !t.Used && t.ExpiresAt > DateTime.UtcNow)
+                .OrderByDescending(t => t.Id)
+                .FirstOrDefaultAsync();
 
-		//Onboarding status update
-		public async Task<int> UpdateOnboardingStatusAsync(Guid userId, int status)
-		{
-			const string sql = @"UPDATE UserProfile SET OnboardingStatus = @Status WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.ExecuteAsync(sql, new { UserId = userId, Status = status });
-		}
+            return row is null ? (Guid.Empty, false) : (row.UserId, true);
+        }
 
-		//More than 1 income sources
-		public async Task AddOtherIncomeAsync(Guid userId, string source, decimal amount, string frequency)
-		{
-			const string sql = @"INSERT INTO OtherIncome (Id, UserId, Source, Amount, Frequency, CreatedAt)
-                     VALUES (NEWID(), @UserId, @Source, @Amount, @Frequency, SYSUTCDATETIME())";
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { UserId = userId, Source = source, Amount = amount, Frequency = frequency });
-		}
+        public async Task<int> MarkPasswordResetTokenUsedAsync(string token)
+        {
+            var th = HashToken(token);
+            var row = await _db.PasswordResetTokens
+                .OrderByDescending(t => t.Id)
+                .FirstOrDefaultAsync(t => t.TokenHash == th && !t.Used);
 
-		public async Task<IEnumerable<dynamic>> GetOtherIncomeAsync(Guid userId)
-		{
-			const string sql = @"SELECT * FROM OtherIncome WHERE UserId=@UserId ORDER BY CreatedAt DESC";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryAsync(sql, new { UserId = userId });
-		}
+            if(row == null) return 0;
+            row.Used = true;
+            return await _db.SaveChangesAsync();
+        }
 
-		public async Task UpdateOtherIncomeAsync(Guid id, string source, decimal amount, string frequency)
-		{
-			const string sql = @"
-        UPDATE OtherIncome
-        SET Source     = @Source,
-            Amount     = @Amount,
-            Frequency  = @Frequency,
-            UpdatedAt  = SYSUTCDATETIME()
-        WHERE Id = @Id";
+        // ---------- User Profile ----------
+        public async Task<int> CreateUserProfileAsync(Guid userId)
+        {
+            if(!await _db.UserProfiles.AnyAsync(p => p.UserId == userId))
+            {
+                _db.UserProfiles.Add(new UserProfile
+                {
+                    UserId = userId,
+                    Currency = "AUD",
+                    Timezone = null,
+                    OnboardingStatus = 0
+                });
+            }
+            return await _db.SaveChangesAsync();
+        }
 
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { Id = id, Source = source, Amount = amount, Frequency = frequency });
-		}
+        public Task<UserProfile?> GetUserProfileAsync(Guid userId)
+            => _db.UserProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
 
-		public async Task DeleteOtherIncomeAsync(Guid id, Guid userId)
-		{
-			const string sql = @"DELETE FROM OtherIncome WHERE Id = @Id AND UserId = @UserId";
+        public async Task<int> UpdateOnboardingStatusAsync(Guid userId, int status)
+        {
+            var profile = await _db.UserProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            if(profile == null)
+            {
+                _db.UserProfiles.Add(new UserProfile { UserId = userId, Currency = "AUD", OnboardingStatus = status });
+            }
+            else
+            {
+                profile.OnboardingStatus = status;
+            }
+            return await _db.SaveChangesAsync();
+        }
 
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { Id = id, UserId = userId });
-		}
+        // ---------- Primary Income (IncomeSettings) ----------
+        public async Task SetIncomeAsync(Guid userId, string payFrequency, decimal? net, decimal? gross, decimal? taxWithheld, int? usualPayDay)
+        {
+            var row = await _db.IncomeSettings.FirstOrDefaultAsync(x => x.UserId == userId);
+            if(row == null)
+            {
+                row = new IncomeSettings
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    PayFrequency = payFrequency,
+                    NetPayPerCycle = net,
+                    GrossPayPerCycle = gross,
+                    TaxWithheld = taxWithheld,
+                    UsualPayDay = usualPayDay,
+                    OnboardingStage = 1,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.IncomeSettings.Add(row);
+            }
+            else
+            {
+                row.PayFrequency = payFrequency;
+                row.NetPayPerCycle = net;
+                row.GrossPayPerCycle = gross;
+                row.TaxWithheld = taxWithheld;
+                row.UsualPayDay = usualPayDay;
+                if(row.OnboardingStage == 0) row.OnboardingStage = 1;
+                row.UpdatedAt = DateTime.UtcNow;
+            }
 
+            await _db.SaveChangesAsync();
+        }
 
-		//Daily expenses tracking
-		public async Task AddExpenseAsync(Guid userId, string category, decimal amount, DateTime dateSpent, string? notes, bool taxDeductible, bool workRelated)
-		{
-			const string sql = @"INSERT INTO Expenses (UserId, Category, Amount, DateSpent, Notes, IsTaxDeductible, IsWorkRelated) 
-                         VALUES (@UserId, @Category, @Amount, @DateSpent, @Notes, @IsTaxDeductible, @IsWorkRelated)";
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { UserId = userId, Category = category, Amount = amount, DateSpent = dateSpent, Notes = notes, IsTaxDeductible = taxDeductible, IsWorkRelated = workRelated });
-		}
+        public Task<IncomeSettings?> GetIncomeAsync(Guid userId)
+            => _db.IncomeSettings.FirstOrDefaultAsync(x => x.UserId == userId);
 
-		public async Task<IEnumerable<dynamic>> GetExpensesAsync(Guid userId, DateTime? from = null, DateTime? to = null)
-		{
-			var sql = @"SELECT * FROM Expenses WHERE UserId=@UserId";
-			if (from.HasValue && to.HasValue)
-				sql += " AND DateSpent BETWEEN @From AND @To";
+        // ---------- Other Income ----------
+        public async Task AddOtherIncomeAsync(Guid userId, string source, decimal amount, string frequency)
+        {
+            _db.OtherIncomes.Add(new OtherIncome
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Source = source,
+                Amount = amount,
+                Frequency = frequency,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
 
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryAsync(sql, new { UserId = userId, From = from, To = to });
-		}
+        public async Task<IEnumerable<OtherIncome>> GetOtherIncomeAsync(Guid userId)
+            => await _db.OtherIncomes
+                        .Where(x => x.UserId == userId)
+                        .OrderByDescending(x => x.CreatedAt)
+                        .AsNoTracking()
+                        .ToListAsync();
 
-		//Primary income
-		public async Task SetIncomeAsync(Guid userId, string payFrequency, decimal? netPayPerCycle, decimal? grossPayPerCycle, decimal? taxWithheld, int? usualPayDay)
-		{
-			const string sql = @"
-        MERGE IncomeSettings AS target
-        USING (SELECT @UserId AS UserId) AS source
-        ON target.UserId = source.UserId
-        WHEN MATCHED THEN
-            UPDATE SET PayFrequency = @PayFrequency,
-                       NetPayPerCycle = @NetPayPerCycle,
-                       GrossPayPerCycle = @GrossPayPerCycle,
-                       TaxWithheld = @TaxWithheld,
-                       UsualPayDay = @UsualPayDay,
-                       OnboardingStage = CASE WHEN OnboardingStage = 0 THEN 1 ELSE OnboardingStage END,
-                       UpdatedAt = SYSUTCDATETIME()
-        WHEN NOT MATCHED THEN
-            INSERT (UserId, PayFrequency, NetPayPerCycle, GrossPayPerCycle, TaxWithheld, UsualPayDay, OnboardingStage, CreatedAt)
-            VALUES (@UserId, @PayFrequency, @NetPayPerCycle, @GrossPayPerCycle, @TaxWithheld, @UsualPayDay, 1, SYSUTCDATETIME());";
+        public async Task UpdateOtherIncomeAsync(Guid id, string source, decimal amount, string frequency)
+        {
+            var row = await _db.OtherIncomes.FirstOrDefaultAsync(x => x.Id == id);
+            if(row == null) return;
+            row.Source = source;
+            row.Amount = amount;
+            row.Frequency = frequency;
+            row.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
 
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { userId, payFrequency, netPayPerCycle, grossPayPerCycle, taxWithheld, usualPayDay });
-		}
+        public async Task DeleteOtherIncomeAsync(Guid id, Guid userId)
+        {
+            var row = await _db.OtherIncomes.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId);
+            if(row == null) return;
+            _db.OtherIncomes.Remove(row);
+            await _db.SaveChangesAsync();
+        }
 
+        // ---------- Expenses ----------
+        public async Task AddExpenseAsync(Guid userId, string category, decimal amount, DateTime dateSpent,
+                                          string? notes, bool taxDeductible, bool workRelated)
+        {
+            _db.Expenses.Add(new Expense
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Category = category,
+                Amount = amount,
+                DateSpent = dateSpent,
+                Notes = notes,
+                IsTaxDeductible = taxDeductible,
+                IsWorkRelated = workRelated,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
 
-		public async Task<IncomeSettings?> GetIncomeAsync(Guid userId)
-		{
-			const string sql = "SELECT * FROM IncomeSettings WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryFirstOrDefaultAsync<IncomeSettings>(sql, new { userId });
-		}
+        public async Task<IEnumerable<Expense>> GetExpensesAsync(Guid userId, DateTime? from = null, DateTime? to = null)
+        {
+            var q = _db.Expenses.Where(x => x.UserId == userId);
+            if(from.HasValue && to.HasValue)
+                q = q.Where(x => x.DateSpent >= from.Value && x.DateSpent <= to.Value);
 
-		//Savings
-		public async Task AddSavingsGoalAsync(Guid userId, string name, decimal targetAmount, DateTime? targetDate, decimal amountSaved, int status)
-		{
-			const string sql = @"INSERT INTO SavingsGoals (UserId, Name, TargetAmount, TargetDate, AmountSavedToDate, Status)
-                                 VALUES (@userId, @name, @targetAmount, @targetDate, @amountSaved, @status)";
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { userId, name, targetAmount, targetDate, amountSaved, status });
-		}
+            return await q.AsNoTracking().ToListAsync();
+        }
 
-		public async Task<IEnumerable<SavingsGoal>> GetSavingsGoalsAsync(Guid userId)
-		{
-			const string sql = "SELECT * FROM SavingsGoals WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryAsync<SavingsGoal>(sql, new { userId });
-		}
+        // ---------- Savings ----------
+        public async Task AddSavingsGoalAsync(Guid userId, string name, decimal targetAmount, DateTime? targetDate, decimal amountSaved, int status)
+        {
+            _db.SavingsGoals.Add(new SavingsGoal
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Name = name,
+                TargetAmount = targetAmount,
+                TargetDate = targetDate,
+                AmountSavedToDate = amountSaved,
+                Status = status,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
 
-		//Bills
-		public async Task AddBillAsync(Guid userId, string name, decimal amount, string frequency, DateTime firstDueDate)
-		{
-			const string sql = @"INSERT INTO Bills (UserId, Name, Amount, Frequency, FirstDueDate)
-                                 VALUES (@userId, @name, @amount, @frequency, @firstDueDate)";
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { userId, name, amount, frequency, firstDueDate });
-		}
+        public async Task<IEnumerable<SavingsGoal>> GetSavingsGoalsAsync(Guid userId)
+            => await _db.SavingsGoals.Where(x => x.UserId == userId).AsNoTracking().ToListAsync();
 
-		public async Task<IEnumerable<Bill>> GetBillsAsync(Guid userId)
-		{
-			const string sql = "SELECT * FROM Bills WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryAsync<Bill>(sql, new { userId });
-		}
+        // ---------- Bills ----------
+        public async Task AddBillAsync(Guid userId, string name, decimal amount, string frequency, DateTime firstDueDate)
+        {
+            _db.Bills.Add(new Bill
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Name = name,
+                Amount = amount,
+                Frequency = frequency,
+                FirstDueDate = firstDueDate,
+                Status = 1
+            });
+            await _db.SaveChangesAsync();
+        }
 
-		//Loans
-		public async Task AddLoanAsync(Guid userId, LoanDto dto)
-		{
-			var sql = @"INSERT INTO Loans
-                (UserId, Name, Principal, InterestRate, RepaymentAmount, RepaymentFrequency,
-                 RemainingBalance, RemainingTermMonths, AmountPaidSoFar, StartDate)
-                VALUES (@UserId, @Name, @Principal, @InterestRate, @RepaymentAmount,
-                        @RepaymentFrequency, @RemainingBalance, @RemainingTermMonths,
-                        @AmountPaidSoFar, @StartDate)";
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new
-			{
-				UserId = userId,
-				dto.Name,
-				dto.Principal,
-				dto.InterestRate,
-				dto.RepaymentAmount,
-				dto.RepaymentFrequency,
-				dto.RemainingBalance,
-				dto.RemainingTermMonths,
-				dto.AmountPaidSoFar,
-				dto.StartDate
-			});
-		}
+        public async Task<IEnumerable<Bill>> GetBillsAsync(Guid userId)
+            => await _db.Bills.Where(x => x.UserId == userId).AsNoTracking().ToListAsync();
 
-		public async Task<IEnumerable<LoanAccount>> GetLoansAsync(Guid userId)
-		{
-			var sql = "SELECT * FROM Loans WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryAsync<LoanAccount>(sql, new { UserId = userId });
-		}
+        // ---------- Loans ----------
+        public async Task AddLoanAsync(Guid userId, LoanDto dto)
+        {
+            _db.Loans.Add(new LoanAccount
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Name = dto.Name,
+                Principal = dto.Principal,
+                InterestRate = dto.InterestRate,
+                RepaymentAmount = dto.RepaymentAmount,
+                RepaymentFrequency = dto.RepaymentFrequency,
+                RemainingBalance = dto.RemainingBalance,
+                RemainingTermMonths = dto.RemainingTermMonths,
+                AmountPaidSoFar = dto.AmountPaidSoFar,
+                StartDate = dto.StartDate
+            });
+            await _db.SaveChangesAsync();
+        }
 
+        public async Task<IEnumerable<LoanAccount>> GetLoansAsync(Guid userId)
+            => await _db.Loans.Where(x => x.UserId == userId).AsNoTracking().ToListAsync();
 
-		//Tax settings
-		public async Task SetTaxSettingsAsync(Guid userId, decimal? taxWithheldPerCycle, bool medicareLevyExempt, bool privateHealthCover)
-		{
-			const string sql = @"
-                MERGE TaxSettings AS target
-                USING (SELECT @UserId AS UserId) AS source
-                ON target.UserId = source.UserId
-                WHEN MATCHED THEN
-                    UPDATE SET TaxWithheldPerCycle = @taxWithheldPerCycle,
-                               MedicareLevyExempt = @medicareLevyExempt,
-                               PrivateHealthCover = @privateHealthCover
-                WHEN NOT MATCHED THEN
-                    INSERT (UserId, TaxWithheldPerCycle, MedicareLevyExempt, PrivateHealthCover)
-                    VALUES (@UserId, @taxWithheldPerCycle, @medicareLevyExempt, @privateHealthCover);";
+        // ---------- Tax ----------
+        public async Task SetTaxSettingsAsync(Guid userId, decimal? taxWithheldPerCycle, bool medicareLevyExempt, bool privateHealthCover)
+        {
+            var row = await _db.TaxSettings.FirstOrDefaultAsync(x => x.UserId == userId);
+            if(row == null)
+            {
+                _db.TaxSettings.Add(new TaxSettings
+                {
+                    UserId = userId,
+                    TaxWithheldPerCycle = taxWithheldPerCycle,
+                    MedicareLevyExempt = medicareLevyExempt,
+                    PrivateHealthCover = privateHealthCover
+                });
+            }
+            else
+            {
+                row.TaxWithheldPerCycle = taxWithheldPerCycle;
+                row.MedicareLevyExempt = medicareLevyExempt;
+                row.PrivateHealthCover = privateHealthCover;
+            }
+            await _db.SaveChangesAsync();
+        }
 
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { userId, taxWithheldPerCycle, medicareLevyExempt, privateHealthCover });
-		}
+        public Task<TaxSettings?> GetTaxSettingsAsync(Guid userId)
+            => _db.TaxSettings.FirstOrDefaultAsync(x => x.UserId == userId);
 
-		public async Task<TaxSettings?> GetTaxSettingsAsync(Guid userId)
-		{
-			const string sql = "SELECT * FROM TaxSettings WHERE UserId = @UserId";
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryFirstOrDefaultAsync<TaxSettings>(sql, new { userId });
-		}
+        // ---------- Income Transactions ----------
+        public async Task AddIncomeTransactionAsync(Guid userId, Guid sourceId, DateTime txnDate, decimal gross, decimal? net, string? notes)
+        {
+            _db.IncomeTransactions.Add(new IncomeTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                SourceId = sourceId,
+                TxnDate = txnDate,
+                GrossAmount = gross,
+                NetAmount = net ?? gross,
+                Notes = notes,
+                CreatedAt = DateTime.UtcNow
+            });
 
-		//Income transactions
+            var settings = await _db.IncomeSettings.FirstOrDefaultAsync(x => x.UserId == userId);
+            if(settings != null && settings.OnboardingStage < 2)
+            {
+                settings.OnboardingStage = 2;
+                settings.UpdatedAt = DateTime.UtcNow;
+            }
 
-		public async Task AddIncomeTransactionAsync(Guid userId, Guid sourceId, DateTime txnDate, decimal gross, decimal? net, string? notes)
-		{
-			const string sql = @"
-        INSERT INTO IncomeTransactions (Id, UserId, SourceId, TxnDate, GrossAmount, NetAmount, Notes, CreatedAt)
-        VALUES (NEWID(), @UserId, @SourceId, @TxnDate, @GrossAmount, @NetAmount, @Notes, SYSUTCDATETIME());
+            await _db.SaveChangesAsync();
+        }
 
-        UPDATE IncomeSettings
-        SET OnboardingStage = 2, UpdatedAt = SYSUTCDATETIME()
-        WHERE UserId = @UserId AND OnboardingStage < 2;
-    ";
+        public async Task<IEnumerable<IncomeTransactionDto>> GetIncomeTransactionsAsync(Guid userId, Guid sourceId)
+        {
+            return await _db.IncomeTransactions
+                .Where(t => t.UserId == userId && t.SourceId == sourceId)
+                .OrderByDescending(t => t.TxnDate)
+                .Select(t => new IncomeTransactionDto
+                {
+                    Id = t.Id,
+                    SourceId = t.SourceId,
+                    TxnDate = t.TxnDate,
+                    GrossAmount = t.GrossAmount,
+                    NetAmount = t.NetAmount,
+                    Notes = t.Notes
+                })
+                .ToListAsync();
+        }
 
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { UserId = userId, SourceId = sourceId, TxnDate = txnDate, GrossAmount = gross, NetAmount = net ?? gross, Notes = notes });
-		}
+        public async Task DeleteIncomeTransactionAsync(Guid userId, Guid txnId)
+        {
+            var row = await _db.IncomeTransactions.FirstOrDefaultAsync(t => t.Id == txnId && t.UserId == userId);
+            if(row == null) return;
+            _db.IncomeTransactions.Remove(row);
+            await _db.SaveChangesAsync();
+        }
 
-
-
-		public async Task<IEnumerable<IncomeTransactionDto>> GetIncomeTransactionsAsync(Guid userId, Guid sourceId)
-		{
-			const string sql = @"
-        SELECT Id, SourceId, TxnDate, GrossAmount, NetAmount, Notes, CreatedAt
-        FROM IncomeTransactions
-        WHERE SourceId = @SourceId AND UserId = @UserId
-        ORDER BY TxnDate DESC";
-
-			using var conn = new SqlConnection(_connectionString);
-			return await conn.QueryAsync<IncomeTransactionDto>(sql, new { SourceId = sourceId, UserId = userId });
-		}
-
-
-		public async Task DeleteIncomeTransactionAsync(Guid userId, Guid txnId)
-		{
-			const string sql = @"DELETE FROM IncomeTransactions WHERE Id = @Id AND UserId = @UserId";
-
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { Id = txnId, UserId = userId });
-		}
-
-		public async Task UpdateIncomeTransactionAsync(Guid userId, Guid txnId, DateTime txnDate, decimal gross, decimal? net, string? notes)
-		{
-			const string sql = @"
-        UPDATE IncomeTransactions
-        SET TxnDate     = @TxnDate,
-            GrossAmount = @GrossAmount,
-            NetAmount   = @NetAmount,
-            Notes       = @Notes,
-            UpdatedAt   = SYSUTCDATETIME()
-        WHERE Id = @Id AND UserId = @UserId";
-
-			using var conn = new SqlConnection(_connectionString);
-			await conn.ExecuteAsync(sql, new { Id = txnId, UserId = userId, TxnDate = txnDate, GrossAmount = gross, NetAmount = net ?? gross, Notes = notes });
-		}
-
-
-		//me
-		public async Task<User?> GetUserByIdAsync(Guid id)
-		{
-			const string sql = "SELECT * FROM Users WHERE Id = @Id AND IsActive = 1";
-			using var conn = new SqlConnection(_connectionString);
-			await conn.OpenAsync();
-			return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Id = id });
-		}
-	}
+        public async Task UpdateIncomeTransactionAsync(Guid userId, Guid txnId, DateTime txnDate, decimal gross, decimal? net, string? notes)
+        {
+            var row = await _db.IncomeTransactions.FirstOrDefaultAsync(t => t.Id == txnId && t.UserId == userId);
+            if(row == null) return;
+            row.TxnDate = txnDate;
+            row.GrossAmount = gross;
+            row.NetAmount = net ?? gross;
+            row.Notes = notes;
+            row.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+    }
 }
