@@ -1,16 +1,19 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using Zenvestify.Shared.Services;
 using Zenvestify.Web.Components;
 using Zenvestify.Web.Configs;
 using Zenvestify.Web.Data;
-using Zenvestify.Web.Models;
 using Zenvestify.Web.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+//EF
+builder.Services.AddDbContext<AppDbContext>(options =>
+	options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
 // Add services to the container
@@ -78,9 +81,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	};
 });
 
-//Register service
+//Register service (These two maybe delete later)
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserProfileService>();
+
+
 builder.Services.AddScoped<UserRepository>();
 
 var app = builder.Build();
@@ -107,12 +112,6 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-
-//builder.Services.AddScoped(sp => new HttpClient
-//{
-//	BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
-//});
-
 
 app.UseHttpsRedirection();
 

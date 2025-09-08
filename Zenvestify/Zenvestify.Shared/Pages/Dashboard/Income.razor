@@ -1,0 +1,1282 @@
+﻿@page "/income"
+@using Zenvestify.Shared.Layout
+@using static Zenvestify.Shared.Models.UserProfileDtos
+@layout MainLayout
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject Zenvestify.Shared.Services.AuthService Auth
+@inject Zenvestify.Shared.Services.UserProfileService ProfileService
+
+<h2 class="mb-4">Income Overview</h2>
+
+<main class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-end align-items-center mb-3 gap-2">
+        <div class="btn-group" role="group" aria-label="Period" id="periodControls">
+            <button class="btn btn-outline-light @(SelectedPeriod == "year" ? "active" : "")" @onclick="SetYear">Yearly</button>
+            <button class="btn btn-outline-light @(SelectedPeriod == "month" ? "active" : "")" @onclick="SetMonth">Monthly</button>
+            <button class="btn btn-outline-light @(SelectedPeriod == "fortnight" ? "active" : "")" @onclick="SetFortnight">Fortnightly</button>
+            <button class="btn btn-outline-light @(SelectedPeriod == "week" ? "active" : "")" @onclick="SetWeek">Weekly</button>
+
+        </div>
+    </div>
+
+
+    <!-- KPI Row -->
+    <div class="row g-3">
+        <!-- Primary -->
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <header class="fs-5">Primary Income</header>
+                    <div class="display-amount fs-2 fw-bold">@FormatCurrency(PrimaryDisplayAmount)</div>
+                    <div class="tiny text-muted">per @SelectedPeriodName • @PrimaryLabel</div>
+                    <div class="border-top my-2" style="opacity:.2"></div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm" @onclick="OpenEditPrimary">Edit</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Other -->
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <header class="fs-5">Other Income</header>
+                    <div class="display-amount fs-2 fw-bold">@FormatCurrency(OtherDisplayAmount)</div>
+                    <div class="tiny text-muted">per @SelectedPeriodName • @OtherSourceCount sources</div>
+                    <div class="border-top my-2" style="opacity:.2"></div>
+                    <button class="btn btn-primary btn-sm" @onclick="OpenAddOther">Add Source</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total -->
+        <div class="col-12 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <header class="fs-5">Total Combined Income</header>
+                    <div class="display-amount fs-2 fw-bold">@FormatCurrency(TotalDisplayAmount)</div>
+                    <div class="tiny text-muted">per @SelectedPeriodName • Net totals exclude gross-only primary</div>
+                    <div class="border-top my-2" style="opacity:.2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Income Sources (quick manage) -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="h6 mb-0">Income Sources (quick manage)</div>
+                <div class="d-flex gap-2">
+                    <input class="form-control form-control-sm bg-transparent text-white" placeholder="Filter by name…" style="max-width:220px"
+                           @bind="FilterText" @bind:event="oninput" />
+                    <button class="btn btn-primary btn-sm" @onclick="OpenAddOther">Add New Source</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Frequency</th>
+                            <th class="text-end">Gross Baseline</th>
+                            <th class="text-end">Net Baseline</th>
+                            <th class="text-end" style="width:260px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Primary row -->
+                        @if (Primary is not null)
+                        {
+                            <tr>
+                                <td>Full-time Job <span class="badge rounded-pill ms-1" style="background:rgba(255,255,255,.08);border:1px solid #2a3145;">Primary</span></td>
+                                <td>@Primary.PayFrequency</td>
+                                <td class="text-end">@((Primary.GrossPayPerCycle ?? 0) > 0 ? FormatCurrency(Primary.GrossPayPerCycle) : "—")</td>
+                                <td class="text-end">@((Primary.NetPayPerCycle ?? 0) > 0 ? FormatCurrency(Primary.NetPayPerCycle) : "—")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-light me-1" @onclick="OpenEditPrimary">Edit</button>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" disabled title="Transactions are tracked per other sources">➕ Entry</button>
+                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Transactions are tracked per other sources">Details</button>
+                                </td>
+                            </tr>
+                        }
+
+                        <!-- Other rows -->
+                        @foreach (var g in FilteredGroups)
+                        {
+                            <tr>
+                                <td>@g.Name</td>
+                                <td>@g.Frequency</td>
+                                <td class="text-end">—</td> @* we only store net baseline *@
+                                <td class="text-end">@FormatCurrency(g.BaselineNet)</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-light me-1" @onclick="() => OpenEditOtherById(g.CanonicalId)">Edit</button>
+                                    <button class="btn btn-sm btn-outline-light me-1" @onclick="() => OpenEntryById(g.CanonicalId)">➕ Entry</button>
+                                    <button class="btn btn-sm btn-primary me-1" @onclick="() => OpenDetailsGroup(g)">Details</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteOtherGroup(g)">🗑</button>
+                                </td>
+                            </tr>
+                        }
+
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="tiny mt-2">Edit metadata only. Actual payouts are recorded via <strong>Entry</strong> or <strong>Details</strong>. This panel is independent of the calculator.</div>
+        </div>
+    </div>
+
+    @* ----------------- Modals & Offcanvas ----------------- *@
+
+    <!-- Edit Primary Modal -->
+    @if (ShowEditPrimary)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);">
+            <div class="modal-dialog">
+                <div class="modal-content p-3 bg-surface text-light">
+                    <h5>Edit Primary Income</h5>
+                    <div class="mb-2">
+                        <label class="form-label tiny">Pay Frequency</label>
+                        <select class="form-select" @bind="EditPrimaryModel.PayFrequency">
+                            <option>Weekly</option>
+                            <option>Fortnightly</option>
+                            <option>Monthly</option>
+                        </select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label tiny">Gross (per cycle)</label>
+                            <input class="form-control" type="number" step="1" min="0" @bind="EditPrimaryModel.GrossPayPerCycle" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label tiny">Net (per cycle)</label>
+                            <input class="form-control" type="number" step="1" min="0" @bind="EditPrimaryModel.NetPayPerCycle" />
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button class="btn btn-outline-light" @onclick="() => ShowEditPrimary = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SavePrimary">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Add/Edit Other Income Modal -->
+    @if (ShowOtherModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);">
+            <div class="modal-dialog">
+                <div class="modal-content p-3 bg-surface text-light">
+                    <h5>@(EditingOther?.Id == Guid.Empty ? "Add Income Source" : "Edit Income Source")</h5>
+                    <div class="mb-2">
+                        <label class="form-label tiny">Source name</label>
+                        <input class="form-control" @bind="EditingOther!.Source" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label tiny">Frequency</label>
+                        <select class="form-select" @bind="EditingOther!.Frequency">
+                            <option>Weekly</option>
+                            <option>Fortnightly</option>
+                            <option>Monthly</option>
+                            <option>Irregular</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label tiny">Baseline net (per cycle)</label>
+                        <input class="form-control" type="number" step="1" min="0" @bind="EditingOther!.Amount" />
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-outline-light" @onclick="() => ShowOtherModal = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveOther">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Add Entry Modal (Other sources only) -->
+    @if (ShowEntryModal && EntrySource is not null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);">
+            <div class="modal-dialog">
+                <div class="modal-content p-3 bg-surface text-light">
+                    <h5>Add Entry — @EntrySource!.Source</h5>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label tiny">Date</label>
+                            <input class="form-control" type="date" @bind="EntryDate" @bind:format="yyyy-MM-dd" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label tiny">Gross</label>
+                            <input class="form-control" type="number" step="1" min="0" @bind="EntryGross" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label tiny">Net</label>
+                            <input class="form-control" type="number" step="1" min="0" @bind="EntryNet" placeholder="= gross if blank" />
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button class="btn btn-outline-light" @onclick="() => ShowEntryModal = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveEntry">Save Entry</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Details Offcanvas -->
+    <div class="offcanvas offcanvas-end @(ShowDetails ? "show" : "")" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="detailsLabel" style="display:block; visibility:@(ShowDetails ? "visible" : "hidden")">
+        <div class="offcanvas-header">
+            <h5 id="detailsLabel">Source Details</h5>
+            <button type="button" class="btn-close text-reset" @onclick="() => ShowDetails = false"></button>
+        </div>
+        <div class="offcanvas-body">
+            @if (DetailSource is null)
+            {
+                <div class="tiny">No source selected.</div>
+            }
+            else
+            {
+                <div class="tiny mb-2">Transactions for <strong>@DetailSource.Source</strong></div>
+                <div class="table-responsive mb-3">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:38%;">Date</th>
+                                <th>Gross</th>
+                                <th>Net</th>
+                                <th style="width:90px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tx in DetailTransactions)
+                            {
+                                <tr>
+                                    <td>@tx.TxnDate.ToString("dd MMM yyyy")</td>
+                                    <td>@FormatCurrency(tx.GrossAmount)</td>
+                                    <td>@FormatCurrency(tx.NetAmount ?? tx.GrossAmount)</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteEntry(tx.Id)">🗑</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label tiny">Date</label>
+                        <input class="form-control" type="date" @bind="DetailAddDate" @bind:format="yyyy-MM-dd" />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label tiny">Gross</label>
+                        <input class="form-control" type="number" step="1" min="0" @bind="DetailAddGross" />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label tiny">Net</label>
+                        <input class="form-control" type="number" step="1" min="0" @bind="DetailAddNet" />
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary btn-sm" @onclick="AddDetailEntry">Save Entry</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+
+</main>
+
+@* <!-- 2) INCOME SOURCES TABLE (metadata only) -->
+<div class="card mt-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="h6 mb-0">Income Sources</div>
+            <div class="d-flex gap-2">
+                <input id="filterInput" class="form-control form-control-sm" placeholder="Filter by name…" style="max-width:200px">
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#sourceModal"><i class="bi bi-plus-lg me-1"></i>Add New Source</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle mb-0" id="sourcesTable">
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Frequency</th>
+                        <th>Gross Baseline</th>
+                        <th>Net Baseline</th>
+                        <th style="width:240px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="sourcesBody"><!-- rows injected by JS --></tbody>
+            </table>
+        </div>
+
+        <div class="tiny mt-2">Edit metadata only. Actual payouts are recorded via <strong>Entry</strong> or in <strong>Details</strong>.</div>
+    </div>
+</div>
+
+<!-- 3) TRENDS & GRAPHS -->
+<div class="row g-3 mt-1">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Income Trend (Last 12 Months)</div>
+                    <span class="tiny">Primary vs Other vs Total</span>
+                </div>
+                <canvas id="lineChart" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Monthly Breakdown by Source (Stacked)</div>
+                    <span class="tiny">Last 6 months</span>
+                </div>
+                <canvas id="stackedChart" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie chart -->
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Contribution by Source</div>
+                    <span class="tiny">Share of annual net</span>
+                </div>
+                <canvas id="pieChart" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Right-side utilities -->
+    <div class="col-12 col-xl-6">
+        <!-- Upcoming Payouts -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Upcoming Payouts</div>
+                    <span class="tiny">Next 3 expected</span>
+                </div>
+                <ul class="list-group" id="upcomingList"></ul>
+                <div class="tiny mt-2">Based on frequency + last recorded transaction (fallbacks if none).</div>
+            </div>
+        </div>
+
+        <!-- Variance vs Baseline (30 days) -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Variance vs Baseline (30 days)</div>
+                    <span class="tiny">Recent actual vs baseline</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th class="text-end">Baseline (net)</th>
+                                <th class="text-end">Actual avg</th>
+                                <th class="text-end">Δ%</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="varianceBody"><!-- rows injected --></tbody>
+                    </table>
+                </div>
+                <div class="tiny mt-2">Looks at transactions in the last 30 days. If none, shows “—”.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4) TAX MINI SUMMARY -->
+<div class="row g-3 mt-1">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Tax Mini Summary</div>
+                </div>
+                <dl class="metric mb-2">
+                    <dt>Estimated tax withheld (YTD)</dt>
+                    <dd id="tax-withheld-ytd">$—</dd>
+                    <dt>Basis</dt>
+                    <dd>Sum of (Gross − Net) across sources</dd>
+                </dl>
+                <button class="btn btn-primary btn-sm" onclick="location.hash='#tax-centre'">Go to Tax Centre →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5) FUTURE IDEAS (Collapsible) -->
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="h6 mb-0">Future Ideas</div>
+                    <button class="btn btn-outline-light btn-sm" data-bs-toggle="collapse" data-bs-target="#futureIdeas">Toggle</button>
+                </div>
+                <div id="futureIdeas" class="collapse show mt-2">
+                    <div class="mb-2">
+                        <div class="tiny mb-1">Income Goal: Target $100k — <strong id="goalPct">—</strong></div>
+                        <div class="progress" role="progressbar" aria-label="Goal progress" style="height:10px;">
+                            <div id="goalBar" class="progress-bar" style="width:0%;background:var(--color-primary)"></div>
+                        </div>
+                    </div>
+                    <div class="tiny mb-2">Pay Raise Tracker: <span id="raiseText">—</span></div>
+                    <div class="tiny">Income Calendar: Next pay date — <span id="nextPayText">—</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Source Modal (metadata only) -->
+<div class="modal fade" id="sourceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="sourceForm" class="modal-content" onsubmit="return false;">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Add Income Source</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sourceId" />
+                <div class="mb-2">
+                    <label class="form-label tiny">Source name</label>
+                    <input id="f-name" class="form-control" placeholder="e.g., Uber" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label tiny">Frequency</label>
+                    <select id="f-frequency" class="form-select" required>
+                        <option>Weekly</option>
+                        <option>Fortnightly</option>
+                        <option>Monthly</option>
+                        <option>Irregular</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label tiny">Baseline gross (per cycle)</label>
+                    <input id="f-gross" type="number" class="form-control" min="0" step="1" placeholder="e.g., 400">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label tiny">Baseline net (per cycle)</label>
+                    <input id="f-net" type="number" class="form-control" min="0" step="1" placeholder="e.g., 350">
+                </div>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="f-primary">
+                    <label class="form-check-label">This is my primary job</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                <button id="saveSourceBtn" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Entry Modal (per-source transaction) -->
+<div class="modal fade" id="entryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="entryForm" class="modal-content" onsubmit="return false;">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Entry — <span id="entrySourceLabel">—</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="entrySourceId" />
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label tiny">Date</label>
+                        <input id="entry-date" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label tiny">Gross</label>
+                        <input id="entry-gross" type="number" min="0" step="1" class="form-control" required placeholder="e.g., 400">
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label tiny">Net <span class="tiny">(optional)</span></label>
+                        <input id="entry-net" type="number" min="0" step="1" class="form-control" placeholder="e.g., 350">
+                    </div>
+                </div>
+                <div class="tiny mt-2">Tip: Net left blank → defaults to Gross.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                <button id="entrySaveBtn" class="btn btn-primary">Save Entry</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Offcanvas: Details / Transactions -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="detailsCanvas" aria-labelledby="detailsLabel">
+    <div class="offcanvas-header">
+        <h5 id="detailsLabel">Source Details</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="mb-2">
+            <div class="tiny">Transactions for <strong id="detailsName">—</strong></div>
+        </div>
+
+        <div class="table-responsive mb-3">
+            <table class="table align-middle" id="txTable">
+                <thead>
+                    <tr>
+                        <th style="width:38%;">Date</th>
+                        <th>Gross</th>
+                        <th>Net</th>
+                        <th style="width:90px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="txBody"><!-- rows injected --></tbody>
+            </table>
+        </div>
+
+        <form id="txForm" class="row g-2" onsubmit="return false;">
+            <div class="col-12">
+                <div class="tiny">➕ Add Entry</div>
+            </div>
+            <div class="col-6">
+                <label class="form-label tiny">Date</label>
+                <input id="tx-date" type="date" class="form-control" required>
+            </div>
+            <div class="col-3">
+                <label class="form-label tiny">Gross</label>
+                <input id="tx-gross" type="number" min="0" step="1" class="form-control" required>
+            </div>
+            <div class="col-3">
+                <label class="form-label tiny">Net</label>
+                <input id="tx-net" type="number" min="0" step="1" class="form-control">
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary btn-sm" id="tx-add">Save Entry</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- One-time Income Onboarding (Usual Pay Day) -->
+<div class="modal fade" id="incomeOnboardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" onsubmit="return false;">
+            <div class="modal-header">
+                <h5 class="modal-title">Just one thing…</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">We’ll use this to show your upcoming payouts.</p>
+                <div id="onb-weekly" class="mb-2" style="display:none">
+                    <label class="form-label tiny">Usual weekday you get paid</label>
+                    <select id="onb-weekday" class="form-select">
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="0">Sunday</option>
+                    </select>
+                </div>
+                <div id="onb-monthly" style="display:none">
+                    <label class="form-label tiny">Day of month</label>
+                    <input id="onb-dom" type="number" class="form-control" min="1" max="31" placeholder="e.g., 28" />
+                </div>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="onb-hide">
+                    <label class="form-check-label">Don’t show this again</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+                <button id="onb-save" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Graphs -->
+<div class="row g-3 mt-3">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Income Trend (Last 12 Months)</div>
+                </div>
+                <canvas id="incomeTrend" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="h6 mb-0">Contribution by Source</div>
+                </div>
+                <canvas id="incomePie" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Primary Modal -->
+@if (ShowEditModal)
+{
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content p-3 bg-surface text-light">
+                <h5>Edit Primary Job</h5>
+                <label>Frequency</label>
+                <select class="form-select mb-2" @bind="EditIncome.PayFrequency">
+                    <option>Weekly</option>
+                    <option>Fortnightly</option>
+                    <option>Monthly</option>
+                </select>
+                <label>Amount (Net)</label>
+                <input type="number" class="form-control mb-2" @bind="EditIncome.NetPayPerCycle" />
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-outline-light" @onclick="() => ShowEditModal = false">Cancel</button>
+                    <button class="btn btn-brand" @onclick="SaveIncome">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+
+<!-- Add Other Income Modal -->
+@if (ShowAddModal)
+{
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content p-3 bg-surface text-light">
+                <h5>Add Other Income</h5>
+                <label>Source</label>
+                <input class="form-control mb-2" @bind="NewOtherIncome.Source" />
+                <label>Frequency</label>
+                <select class="form-select mb-2" @bind="NewOtherIncome.Frequency">
+                    <option>Weekly</option>
+                    <option>Fortnightly</option>
+                    <option>Monthly</option>
+                    <option>Irregular</option>
+                </select>
+                <label>Amount</label>
+                <input type="number" class="form-control mb-2" @bind="NewOtherIncome.Amount" />
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-outline-light" @onclick="() => ShowAddModal = false">Cancel</button>
+                    <button class="btn btn-brand" @onclick="SaveOtherIncome">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+} *@
+
+@code {
+    // ---------- Data ----------
+    private IncomeDto? Primary;
+    private List<OtherIncomeDto> Others = new();
+
+    // ---------- Period state ----------
+    private string SelectedPeriod = "year";
+    private string SelectedPeriodName => SelectedPeriod switch
+    {
+        "month" => "Month",
+        "fortnight" => "Fortnight",
+        "week" => "Week",
+        _ => "Year"
+    };
+
+    private void SetYear() => SetPeriod("year");
+    private void SetMonth() => SetPeriod("month");
+    private void SetFortnight() => SetPeriod("fortnight");
+    private void SetWeek() => SetPeriod("week");
+    private void SetPeriod(string p) => SelectedPeriod = p;
+
+    // ---------- UI state ----------
+    private string FilterText = "";
+
+    private bool ShowEditPrimary = false;
+    private IncomeDto EditPrimaryModel = new();
+
+    private bool ShowOtherModal = false;
+    private OtherIncomeDto? EditingOther;
+
+    private bool ShowEntryModal = false;
+    private OtherIncomeDto? EntrySource;
+    private DateTime EntryDate { get; set; } = DateTime.Today;
+    private decimal EntryGross;
+    private decimal? EntryNet;
+
+    private bool ShowDetails = false;
+    private OtherIncomeDto? DetailSource;                 // for single-source details
+    private List<IncomeTransactionDto> DetailTransactions = new();
+    private DateTime DetailAddDate { get; set; } = DateTime.Today;
+    private decimal DetailAddGross;
+    private decimal? DetailAddNet;
+
+    // --- Grouped details state (for merged duplicate rows) ---
+    private List<Guid> DetailGroupIds = new();
+    private string? DetailGroupName;
+
+    // ---------- Lifecycle ----------
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.WhenReady;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        Primary = await ProfileService.GetIncomeAsync();
+        Others = await ProfileService.GetOtherIncomeAsync() ?? new();
+        StateHasChanged();
+    }
+
+    // ---------- Helpers ----------
+    private decimal PeriodFactor(string? freq) => (freq ?? "").ToLower() switch
+    {
+        "weekly" => 52m,
+        "fortnightly" => 26m,
+        "monthly" => 12m,
+        _ => 0m // irregular
+    };
+
+    private decimal DisplayFactor() => SelectedPeriod switch
+    {
+        "month" => 1m / 12m,
+        "fortnight" => 1m / 26m,
+        "week" => 1m / 52m,
+        _ => 1m // year
+    };
+
+    private string FormatCurrency(decimal? v)
+        => v is null
+            ? "—"
+            : string.Format(System.Globalization.CultureInfo.GetCultureInfo("en-AU"), "{0:C0}", v.Value);
+
+    private decimal NormalizeToAnnual(decimal perCycle, string? freq)
+    {
+        var f = PeriodFactor(freq);
+        return f == 0 ? 0 : perCycle * f;
+    }
+
+    // ---------- KPIs ----------
+    private decimal PrimaryDisplayAmount
+        => Primary is null ? 0 :
+           (Primary.NetPayPerCycle.HasValue
+                ? NormalizeToAnnual(Primary.NetPayPerCycle!.Value, Primary.PayFrequency) * DisplayFactor()
+                : Primary.GrossPayPerCycle.HasValue
+                    ? NormalizeToAnnual(Primary.GrossPayPerCycle!.Value, Primary.PayFrequency) * DisplayFactor()
+                    : 0);
+
+    private string PrimaryLabel
+        => Primary is null
+            ? "—"
+            : (Primary.NetPayPerCycle.HasValue ? "Net (per cycle)" :
+               Primary.GrossPayPerCycle.HasValue ? "Gross (per cycle)" : "—");
+
+    private int OtherSourceCount => GroupedOthers.Count; // count after grouping
+
+    private decimal OtherAnnualNet
+        => Others.Sum(o => NormalizeToAnnual(o.Amount, o.Frequency));
+
+    private decimal OtherDisplayAmount => OtherAnnualNet * DisplayFactor();
+
+    private decimal TotalDisplayAmount
+    {
+        get
+        {
+            var netFromPrimary = (Primary?.NetPayPerCycle is not null)
+                ? NormalizeToAnnual(Primary.NetPayPerCycle!.Value, Primary!.PayFrequency)
+                : 0m; // exclude gross-only primary from "Net totals"
+            return (netFromPrimary + OtherAnnualNet) * DisplayFactor();
+        }
+    }
+
+    // ---------- GROUPING (collapse duplicate names) ----------
+    private static string Norm(string? s) => (s ?? "").Trim().ToLowerInvariant();
+
+    private sealed class GroupedSource
+    {
+        public string Name { get; init; } = "";
+        public List<OtherIncomeDto> Items { get; init; } = new();
+
+        public List<Guid> Ids => Items.Select(i => i.Id).ToList();
+
+        // Use first row as canonical target for edits/new entries
+        public Guid CanonicalId => Items.First().Id;
+
+        // If all rows share the same frequency, show it; otherwise mark as Irregular
+        public string Frequency =>
+            Items.Select(i => i.Frequency).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1
+                ? Items.First().Frequency
+                : "Irregular";
+
+        // Baseline net: metadata — don’t sum; just show first
+        public decimal BaselineNet => Items.First().Amount;
+    }
+
+    private List<GroupedSource> GroupedOthers =>
+        Others
+            .GroupBy(o => Norm(o.Source))
+            .Select(g => new GroupedSource
+            {
+                Name = g.First().Source,
+                Items = g.ToList()
+            })
+            .OrderBy(g => g.Name)
+            .ToList();
+
+    private IEnumerable<GroupedSource> FilteredGroups =>
+        GroupedOthers.Where(g => string.IsNullOrWhiteSpace(FilterText)
+                              || g.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase));
+
+    // ---------- Primary edit ----------
+    private void OpenEditPrimary()
+    {
+        if (Primary is not null)
+        {
+            EditPrimaryModel = new IncomeDto
+            {
+                PayFrequency = Primary.PayFrequency,
+                NetPayPerCycle = Primary.NetPayPerCycle,
+                GrossPayPerCycle = Primary.GrossPayPerCycle,
+                TaxWithheld = Primary.TaxWithheld,
+                UsualPayDay = Primary.UsualPayDay
+            };
+        }
+        else
+        {
+            EditPrimaryModel = new IncomeDto { PayFrequency = "Monthly" };
+        }
+        ShowEditPrimary = true;
+    }
+
+    private async Task SavePrimary()
+    {
+        await ProfileService.SetIncomeAsync(EditPrimaryModel);
+        ShowEditPrimary = false;
+        await LoadData();
+    }
+
+    // ---------- Other sources (add/edit/delete) ----------
+    private void OpenAddOther()
+    {
+        EditingOther = new OtherIncomeDto
+        {
+            Id = Guid.Empty,
+            Source = "",
+            Amount = 0,
+            Frequency = "Monthly"
+        };
+        ShowOtherModal = true;
+    }
+
+    private void OpenEditOther(OtherIncomeDto src)
+    {
+        EditingOther = new OtherIncomeDto
+        {
+            Id = src.Id,
+            Source = src.Source,
+            Amount = src.Amount,
+            Frequency = src.Frequency
+        };
+        ShowOtherModal = true;
+    }
+
+    private void OpenEditOtherById(Guid id)
+    {
+        var src = Others.First(x => x.Id == id);
+        OpenEditOther(src);
+    }
+
+    private async Task SaveOther()
+    {
+        if (EditingOther is null) return;
+
+        if (EditingOther.Id == Guid.Empty)
+            await ProfileService.AddOtherIncomeAsync(EditingOther);
+        else
+            await ProfileService.UpdateOtherIncomeAsync(EditingOther.Id, EditingOther);
+
+        ShowOtherModal = false;
+        await LoadData();
+    }
+
+    private async Task DeleteOther(Guid id)
+    {
+        await ProfileService.DeleteOtherIncomeAsync(id);
+        await LoadData();
+    }
+
+    private async Task DeleteOtherGroup(GroupedSource g)
+    {
+        foreach (var id in g.Ids)
+            await ProfileService.DeleteOtherIncomeAsync(id);
+        await LoadData();
+    }
+
+    // ---------- Entries (Other only) ----------
+    private void OpenEntry(OtherIncomeDto src)
+    {
+        EntrySource = src;
+        EntryDate = DateTime.Today;
+        EntryGross = src.Amount; // prefill
+        EntryNet = src.Amount;
+        ShowEntryModal = true;
+    }
+
+    private void OpenEntryById(Guid id)
+    {
+        var src = Others.First(x => x.Id == id);
+        OpenEntry(src);
+    }
+
+    private async Task SaveEntry()
+    {
+        if (EntrySource is null) return;
+
+        var dto = new IncomeTransactionDto
+        {
+            SourceId = EntrySource.Id,
+            TxnDate = EntryDate,
+            GrossAmount = EntryGross,
+            NetAmount = (EntryNet == null || EntryNet == 0) ? EntryGross : EntryNet,
+            Notes = null
+        };
+
+        await ProfileService.AddIncomeTransactionAsync(dto);
+        ShowEntryModal = false;
+
+        // If a details panel is open, refresh it appropriately
+        if (ShowDetails)
+        {
+            if (DetailGroupIds != null && DetailGroupIds.Count > 0 &&
+                DetailGroupIds.Contains(EntrySource.Id))
+            {
+                await LoadDetailsForGroup();
+            }
+            else if (DetailSource?.Id == EntrySource.Id)
+            {
+                await LoadDetails(DetailSource);
+            }
+        }
+    }
+
+    // ---------- Details (single) ----------
+    private void OpenDetails(OtherIncomeDto src)
+    {
+        _ = LoadDetails(src);
+    }
+
+    private async Task LoadDetails(OtherIncomeDto src)
+    {
+        // single-source details
+        DetailGroupIds = new();         // clear group mode
+        DetailGroupName = null;
+
+        DetailSource = src;
+        ShowDetails = true;
+        DetailTransactions = await ProfileService.GetIncomeTransactionsAsync(src.Id) ?? new();
+       
+        StateHasChanged();
+    }
+
+    // ---------- Details (grouped) ----------
+    private async Task OpenDetailsGroup(GroupedSource g)
+    {
+        DetailGroupName = g.Name;
+        DetailGroupIds = g.Ids;
+
+        // keep a canonical source for add-entry fallbacks
+        DetailSource = Others.First(x => x.Id == g.CanonicalId);
+
+        ShowDetails = true;
+        await LoadDetailsForGroup();
+    }
+
+    private async Task LoadDetailsForGroup()
+    {
+        var all = new List<IncomeTransactionDto>();
+        foreach (var id in DetailGroupIds)
+        {
+            var list = await ProfileService.GetIncomeTransactionsAsync(id) ?? new();
+            all.AddRange(list);
+        }
+        DetailTransactions = all.OrderByDescending(t => t.TxnDate).ToList();
+        StateHasChanged();
+    }
+
+    // Add entry from the offcanvas (supports both single & grouped modes)
+    private async Task AddDetailEntry()
+    {
+        Guid targetId =
+            (DetailGroupIds != null && DetailGroupIds.Count > 0)
+                ? DetailGroupIds[0]                  // canonical = first in group
+                : DetailSource!.Id;
+
+        var dto = new IncomeTransactionDto
+        {
+            SourceId = targetId,
+            TxnDate = DetailAddDate,
+            GrossAmount = DetailAddGross,
+            NetAmount = (DetailAddNet == null || DetailAddNet == 0) ? DetailAddGross : DetailAddNet,
+            Notes = null
+        };
+
+        await ProfileService.AddIncomeTransactionAsync(dto);
+
+        if (DetailGroupIds != null && DetailGroupIds.Count > 0)
+            await LoadDetailsForGroup();
+        else if (DetailSource is not null)
+            await LoadDetails(DetailSource);
+
+        DetailAddGross = 0;
+        DetailAddNet = null;
+    }
+
+    private async Task DeleteEntry(Guid id)
+    {
+        await ProfileService.DeleteIncomeTransactionAsync(id);
+
+        if (DetailGroupIds != null && DetailGroupIds.Count > 0)
+            await LoadDetailsForGroup();
+        else if (DetailSource is not null)
+            await LoadDetails(DetailSource);
+    }
+}
+
+
+
+@* @code {
+    private IncomeDto? PrimaryIncome;
+    private List<OtherIncomeDto>
+    OtherIncomes = new();
+
+    private bool ShowEditModal = false;
+    private bool ShowAddModal = false;
+
+    private IncomeDto EditIncome = new();
+    private OtherIncomeDto NewOtherIncome = new();
+
+    private ElementReference trendRef;
+    private ElementReference pieRef;
+
+    private Dictionary<string, string> PrimaryBreakdown => BuildPrimaryBreakdown();
+
+    private Dictionary<string, string> BuildPrimaryBreakdown()
+    {
+        var dict = new Dictionary<string, string>
+            ();
+
+        if (PrimaryIncome == null)
+            return dict;
+
+        decimal perCycle = PrimaryIncome.NetPayPerCycle ?? PrimaryIncome.GrossPayPerCycle ?? 0;
+        string freq = PrimaryIncome.PayFrequency?.ToLower() ?? "";
+
+        decimal yearly = freq switch
+        {
+            "weekly" => perCycle * 52,
+            "fortnightly" => perCycle * 26,
+            "monthly" => perCycle * 12,
+            _ => perCycle
+        };
+
+        dict["Yearly"] = yearly.ToString("C0");
+        dict["Monthly"] = (yearly / 12).ToString("C0");
+        dict["Fortnightly"] = (yearly / 26).ToString("C0");
+        dict["Weekly"] = (yearly / 52).ToString("C0");
+
+        return dict;
+    }
+
+    private string CycleType =>
+    PrimaryIncome?.NetPayPerCycle != null ? "Net (per cycle)" :
+    PrimaryIncome?.GrossPayPerCycle != null ? "Gross (per cycle)" :
+    "";
+
+    private string OtherIncomeTotalDisplay => OtherIncomes.Sum(i => i.Amount).ToString("C");
+    private string TotalIncomeDisplay => ((PrimaryIncome?.NetPayPerCycle ?? PrimaryIncome?.GrossPayPerCycle ?? 0)
+    + OtherIncomes.Sum(i => i.Amount)).ToString("C");
+    private string SelectedPeriod = "Per Cycle";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Auth.WhenReady;
+
+            PrimaryIncome = await ProfileService.GetIncomeAsync();
+
+            if (PrimaryIncome != null && !PrimaryIncome.UsualPayDay.HasValue)
+            {
+                //OnboardingIncome = PrimaryIncome;
+                //ShowIncomeOnboardingModal = true;
+            }
+
+            OtherIncomes = await ProfileService.GetOtherIncomeAsync() ?? new();
+
+            await JS.InvokeVoidAsync("ZvIncomeCharts.init", PrimaryIncome, OtherIncomes);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Income] Error: {ex.Message}");
+        }
+    }
+
+    private async Task LoadData()
+    {
+        PrimaryIncome = await ProfileService.GetIncomeAsync();
+        OtherIncomes = await ProfileService.GetOtherIncomeAsync() ?? new();
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && PrimaryIncome is not null)
+        {
+            await JS.InvokeVoidAsync("ZvIncomeCharts.init", PrimaryIncome, OtherIncomes);
+        }
+    }
+
+
+    private void OpenEditIncome()
+    {
+        if (PrimaryIncome is not null)
+            EditIncome = new IncomeDto
+            {
+                PayFrequency = PrimaryIncome.PayFrequency,
+                NetPayPerCycle = PrimaryIncome.NetPayPerCycle,
+                GrossPayPerCycle = PrimaryIncome.GrossPayPerCycle,
+                TaxWithheld = PrimaryIncome.TaxWithheld,
+                UsualPayDay = PrimaryIncome.UsualPayDay
+            };
+        ShowEditModal = true;
+    }
+
+    private async Task SaveIncome()
+    {
+        await ProfileService.SetIncomeAsync(EditIncome);
+        ShowEditModal = false;
+        await LoadData();
+    }
+
+    private void OpenAddOtherIncome()
+    {
+        NewOtherIncome = new OtherIncomeDto { Frequency = "Irregular" };
+        ShowAddModal = true;
+    }
+
+    private async Task SaveOtherIncome()
+    {
+        await ProfileService.AddOtherIncomeAsync(NewOtherIncome);
+        ShowAddModal = false;
+        await LoadData();
+    }
+
+    private async Task SaveOnboarding()
+    {
+        //if (LastPayDate.HasValue && OnboardingIncome.PayFrequency == "Fortnightly")
+        {
+            //OnboardingIncome.UsualPayDay = (int)LastPayDate.Value.DayOfWeek;
+        //}
+
+        //await ProfileService.SetIncomeAsync(OnboardingIncome);
+        //await ProfileService.CompleteIncomeOnboardingAsync();
+
+        //ShowIncomeOnboardingModal = false;
+        PrimaryIncome = await ProfileService.GetIncomeAsync();
+        StateHasChanged();
+    }
+}
+} *@
+
+<script src="_content/Zenvestify.Shared/js/income.js"></script>
+
+
+@* unused *@
+
+@* <div class="row g-3"> *@
+
+
+@*  <!-- Primary Job -->
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="tiny text-uppercase">Primary Job</span>
+                    <i class="bi bi-briefcase"></i>
+                </div>
+
+                @if (PrimaryBreakdown.Any())
+                {
+                    <div class="income-breakdown">
+                        @foreach (var kv in PrimaryBreakdown)
+                        {
+                            <div class="row">
+                                <div class="col-6 text-muted">@kv.Key</div>
+                                <div class="col-6 text-end fw-bold">@kv.Value</div>
+                            </div>
+                        }
+                        <div class="tiny mt-2">@CycleType</div>
+                    </div>
+                }
+                else
+                {
+                    <p>No primary income set</p>
+                }
+            </div>
+        </div>
+    </div> *@
+
+        @* 
+    <!-- Other Sources -->
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="tiny text-uppercase">Other Sources</span>
+                    <i class="bi bi-diagram-3"></i>
+                </div>
+                <div class="kpi-value"><span id="kpi-other-value">@OtherIncomeTotalDisplay</span> / Month</div>
+                <div class="tiny"><span id="kpi-other-count">@OtherIncomes.Count</span> sources</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Income with toggle -->
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="tiny text-uppercase">Total Income</span>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Period toggle" id="periodToggle">
+                        <button class="btn btn-outline-light active" data-period="year">Yearly</button>
+                        <button class="btn btn-outline-light" data-period="month">Monthly</button>
+                        <button class="btn btn-outline-light" data-period="week">Weekly</button>
+                    </div>
+                </div>
+                @* <div class="kpi-value"><span id="kpi-total-value">@TotalIncomeDisplay</span> / <span id="kpi-total-label">@SelectedPeriodLabel</span></div> *//@
+                <div class="tiny">Net across all sources</div>
+            </div>
+        </div>
+    </div> *@

@@ -1,0 +1,49 @@
+﻿.tax-dashboard {
+    padding: 2rem;
+    color: var(--color-text);
+}
+
+.card {
+    background: var(--color-surface);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,.3);
+    margin-bottom: 1.5rem;
+}
+
+    .card header {
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--color-text-light);
+    }
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.card span-2 {
+    grid-column: span 2;
+}
+
+
+/* constrain tax charts */
+/*.chart-h-240, .chart-h-300 {
+    position: relative;
+}
+
+.chart-h-240 {
+    height: 240px;
+}
+
+.chart-h-300 {
+    height: 300px;
+}*/
+
+/* make canvas fill its wrapper cleanly */
+/*.tax-dashboard canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}*/

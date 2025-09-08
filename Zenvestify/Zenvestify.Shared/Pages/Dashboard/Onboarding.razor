@@ -52,7 +52,7 @@
                     }
                     else if (Step == 2)
                     {
-                        <div class="step">
+                        @* <div class="step">
                             <p class="lead">Is that amount <b>after tax</b> or <b>before tax</b>?</p>
                             <div class="d-flex gap-3 mt-3">
                                 <button class="btn flex-fill @(IsNetPay == true ? "btn-brand" : "btn-outline-light")" @onclick="() => { IsNetPay = true; ShowTaxInput = false; }">After Tax (Net)</button>
@@ -67,6 +67,20 @@
                                     <small class="text-muted mt-2">Don’t worry if you’re not sure — we’ll estimate it for you.</small>
                                 </div>
                             }
+                        </div> *@
+
+                        <div class="step">
+                            <p class="lead">Is that amount <b>after tax</b> (take-home) or <b>before tax</b> (salary package)?</p>
+                            <div class="d-flex gap-3 mt-3">
+                                <button class="btn flex-fill @(IsNetPay == true ? "btn-brand" : "btn-outline-light")"
+                                        @onclick="() => IsNetPay = true">
+                                    After Tax (Net)
+                                </button>
+                                <button class="btn flex-fill @(IsNetPay == false ? "btn-brand" : "btn-outline-light")"
+                                        @onclick="() => IsNetPay = false">
+                                    Before Tax (Gross)
+                                </button>
+                            </div>
                         </div>
                     }
                     else if (Step == 3)

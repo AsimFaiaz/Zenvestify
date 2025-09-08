@@ -42,14 +42,14 @@ namespace Zenvestify.Web.Controllers
 		}
 
 		//Income
-		// ------------------- INCOME -------------------
 		[HttpPost("income")]
 		public async Task<IActionResult> SetIncome([FromBody] IncomeDto dto)
 		{
 			var userId = GetUserId();
-			await _userRepository.SetIncomeAsync(userId, dto.PayFrequency, dto.NetPayPerCycle, dto.GrossPayPerCycle, dto.TaxWithheld);
+			await _userRepository.SetIncomeAsync(userId, dto.PayFrequency, dto.NetPayPerCycle, dto.GrossPayPerCycle, dto.TaxWithheld, dto.UsualPayDay);
 			return Ok();
 		}
+
 
 		[HttpGet("income")]
 		public async Task<IActionResult> GetIncome()
@@ -77,12 +77,67 @@ namespace Zenvestify.Web.Controllers
 			return Ok(data);
 		}
 
+	
+		[HttpPut("otherincome/{id:guid}")]
+		public async Task<IActionResult> UpdateOtherIncome(Guid id, [FromBody] OtherIncomeDto dto)
+		{
+			await _userRepository.UpdateOtherIncomeAsync(id, dto.Source, dto.Amount, dto.Frequency);
+			return Ok(new { message = "Secondary Income updated successfully" });
+		}
+
+		
+		[HttpDelete("otherincome/{id:guid}")]
+		public async Task<IActionResult> DeleteOtherIncome(Guid id)
+		{
+			var userId = GetUserId();
+			await _userRepository.DeleteOtherIncomeAsync(id, userId);
+			return Ok(new { message = "Secondary Income deleted successfully" });
+		}
+
+		//Income Transactions
+
+		[HttpPost("income/transaction")]
+		public async Task<IActionResult> AddIncomeTransaction([FromBody] IncomeTransactionDto dto)
+		{
+			var userId = GetUserId();
+			await _userRepository.AddIncomeTransactionAsync(userId, dto.SourceId, dto.TxnDate, dto.GrossAmount, dto.NetAmount, dto.Notes);
+			return Ok(new { message = "Transaction added successfully" });
+		}
+
+
+		[HttpGet("income/transactions/{sourceId:guid}")]
+		public async Task<IActionResult> GetIncomeTransactions(Guid sourceId)
+		{
+			var userId = GetUserId();
+			var data = await _userRepository.GetIncomeTransactionsAsync(userId, sourceId);
+			return Ok(data);
+		}
+
+
+
+		[HttpPut("income/transaction/{id:guid}")]
+		public async Task<IActionResult> UpdateIncomeTransaction(Guid id, [FromBody] IncomeTransactionDto dto)
+		{
+			var userId = GetUserId();
+			await _userRepository.UpdateIncomeTransactionAsync(userId, id, dto.TxnDate, dto.GrossAmount, dto.NetAmount, dto.Notes);
+			return Ok(new { message = "Transaction updated successfully" });
+		}
+
+
+		[HttpDelete("income/transaction/{id:guid}")]
+		public async Task<IActionResult> DeleteIncomeTransaction(Guid id)
+		{
+			var userId = GetUserId();
+			await _userRepository.DeleteIncomeTransactionAsync(userId, id);
+			return Ok(new { message = "Transaction deleted successfully" });
+		}
+
 		//Saving
 		[HttpPost("savings")]
 		public async Task<IActionResult> AddSavings([FromBody] SavingsGoalDto dto)
 		{
 			var userId = GetUserId();
-			await _userRepository.AddSavingsGoalAsync(userId, dto.Name, dto.TargetAmount, dto.TargetDate);
+			await _userRepository.AddSavingsGoalAsync(userId, dto.Name, dto.TargetAmount, dto.TargetDate, dto.AmountSavedToDate ?? 0, dto.Status);
 			return Ok();
 		}
 

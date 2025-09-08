@@ -9,5 +9,6 @@
 		public DateTime? TargetDate { get; set; }
 		public decimal AmountSavedToDate { get; set; }
 		public int Status { get; set; } // 0=Active, 1=Completed
+		public DateTime CreatedAt { get; set; }
 	}
 }
