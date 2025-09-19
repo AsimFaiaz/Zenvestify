@@ -23,10 +23,10 @@
 
   <section id="tech-stack">
   <h2>Tech Stack</h2>
-      <pre>ASP.NET Core 9</pre>
-      <pre>Blazor Hybrid</pre>
-      <pre>SQL Server</pre>
-      <pre>Dapper ✖ / ➠ EF Core</pre>
+      <pre> ☑ ASP.NET Core 9</pre>
+      <pre> ☑ Blazor Hybrid</pre>
+      <pre> ☑ SQL Server</pre>
+      <pre> ☒ Dapper ➠  ☑ EF Core</pre>
 </section>
 
   <p><em>Note:</em> Features, design, and architecture may change as development continues.</p>
