@@ -1,7 +1,7 @@
 <section id="project-overview">
   <h1>Zenvestify</h1>
   
-  ✖  ✖  ✖ ![Status](https://img.shields.io/badge/status-active--development-blue)
+*(paused)* ![Status](https://img.shields.io/badge/status-active--development-blue) 
   ![status](https://img.shields.io/badge/status-on--hold%20until%20Nov%2001-red)
   ## Build Status
   [![CI Pipeline](https://github.com/AsimFaiaz/Zenvestify/actions/workflows/dotnet.yml/badge.svg)](https://github.com/AsimFaiaz/Zenvestify/actions/workflows/dotnet.yml)
